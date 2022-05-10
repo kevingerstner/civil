@@ -1,0 +1,108 @@
+<style>
+	::-webkit-scrollbar {
+		width: 4px;
+	}
+	::-webkit-scrollbar-track {
+		background-color: #30be83;
+		border-radius: 2rem;
+		border: 0.3rem solid transparent;
+		background-clip: content-box;
+	}
+</style>
+<script>
+	const articlePreviews = document.getElementsByClassName("article-preview");
+	const desktopTabs = document.getElementsByClassName("tab");
+
+	// Mobile
+	const mobileTabs = document.getElementsByClassName("mobile-tab"); // the collection list of articles that displays as dropdown items
+	const mobileTabsSelected = document.getElementsByClassName("mobile-tab-selected"); // the collection list of articles that displays the currently selected article
+
+	// for each tab in the dropdown, when clicked should open the correct article and show the article as the new dropdown header
+	mobileTabs[0].style.display = "none";
+	for (var i = 0; i < mobileTabs.length; i++) {
+		mobileTabs[i].addEventListener("click", openArticle);
+		mobileTabs[i].selectedTab = mobileTabsSelected[i]; // attach the selected tab to this event
+		mobileTabs[i].desktopTab = desktopTabs[i]; // attach the desktop equivalent for this mobile tab
+		mobileTabs[i].article = articlePreviews[i];
+	}
+
+	//mobile selected article header
+	for (var i = 0; i < mobileTabsSelected.length; i++) {
+		if (i !== 0) mobileTabsSelected[i].style.display = "none";
+		mobileTabsSelected[i].addEventListener("click", toggleDropdown);
+	}
+
+	const dropdownList = document.getElementById("dropdown-list");
+	dropdownList.style.display = "none";
+
+	// Desktop Tabs
+	for (var i = 0; i < desktopTabs.length; i++) {
+		if (i !== 0) desktopTabs[i].classList.remove("active");
+		desktopTabs[i].addEventListener("click", openArticle);
+		desktopTabs[i].article = articlePreviews[i];
+		desktopTabs[i].selectedTab = mobileTabsSelected[i];
+		desktopTabs[i].dropdownItem = mobileTabs[i];
+	}
+	desktopTabs[0].classList.add("active");
+
+	// Content
+	hideArticlePreviews();
+	articlePreviews[0].style.display = "block";
+
+	// Functions
+
+	function openArticle(event) {
+		const clickedTab = event.currentTarget;
+		deactivateTabsDesktop();
+		hideArticlePreviews();
+		deactiveTabsMobile();
+		showDropdownItems();
+		// desktop
+		clickedTab.classList.add("active");
+		if (clickedTab.dropdownItem) {
+			clickedTab.dropdownItem.style.display = "none"; // hide item from mobile dropdown list
+		}
+		//mobile
+		if (clickedTab.desktopTab) {
+			clickedTab.desktopTab.classList.add("active");
+			clickedTab.style.display = "none"; // hide
+			toggleDropdown();
+		}
+		clickedTab.selectedTab.style.display = "block";
+
+		//both
+		event.currentTarget.article.style.display = "block";
+	}
+
+	// Toggles the dropdown menu open and closed
+	function toggleDropdown() {
+		if (dropdownList.style.display === "none") dropdownList.style.display = "block";
+		else dropdownList.style.display = "none";
+	}
+
+	// Shows all tabs in the dropdown
+	function showDropdownItems() {
+		for (tab of mobileTabs) tab.style.display = "block";
+	}
+
+	// Hides all article previews
+	function hideArticlePreviews() {
+		for (article of articlePreviews) {
+			article.style.display = "none";
+		}
+	}
+
+	function deactivateTabsDesktop() {
+		for (tab of desktopTabs) {
+			tab.classList.remove("active");
+		}
+	}
+	function deactiveTabsMobile() {
+		for (tab of mobileTabs) {
+			tab.classList.remove("active");
+		}
+		for (tab of mobileTabsSelected) {
+			tab.style.display = "none";
+		}
+	}
+</script>

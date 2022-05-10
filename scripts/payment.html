@@ -1,0 +1,22 @@
+<script type="module">
+	import {
+		getFunctions,
+		httpsCallable,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
+
+	const functions = getFunctions();
+	const createCheckoutSession = httpsCallable(functions, "stripe-createCheckoutSession");
+
+	const checkoutData = {
+		line_items: [
+			{
+				price: "price_1KuRwDG9RsT33C16SsB0nfur",
+				quantity: 1,
+			},
+		],
+	};
+
+	document.querySelector("#test-btn").addEventListener("click", () => {
+		createCheckoutSession(checkoutData);
+	});
+</script>

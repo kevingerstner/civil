@@ -1,0 +1,284 @@
+<script type="module">
+	import {
+		getAuth,
+		sendEmailVerification,
+		applyActionCode,
+		verifyPasswordResetCode,
+		signInWithEmailAndPassword,
+		sendPasswordResetEmail,
+		confirmPasswordReset,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const auth = getAuth();
+
+	// UI
+	const emailVerifiedUI = document.getElementById("email-verified");
+	const emailVerifiedError = document.getElementById("email-verified-error");
+	const passResetUI = document.getElementById("password-reset-ui");
+	const passResetSuccessUI = document.getElementById("password-reset-success-ui");
+	const passResetErrorUI = document.getElementById("password-reset-error-ui");
+
+	const actionHandlerElements = [
+		emailVerifiedUI,
+		emailVerifiedError,
+		passResetUI,
+		passResetSuccessUI,
+		passResetErrorUI,
+	];
+
+	document.addEventListener(
+		"DOMContentLoaded",
+		() => {
+			const queryString = window.location.search;
+			const urlParams = new URLSearchParams(queryString);
+
+			// Get the Action to complete
+			const mode = urlParams.get("mode");
+			// Get the one-time code
+			const actionCode = urlParams.get("oobCode");
+			// (Optional) Get the continue URL from the query parmeter, if available
+			const continueUrl = urlParams.has("continueUrl") ? urlParams.get("continueUrl") : "";
+			// (Optional) Get the language code if available.
+			const lang = urlParams.has("lang") ? urlParams.get("lang") : "en";
+
+			switch (mode) {
+				case "resetPassword":
+					handleResetPassword(actionCode, continueUrl, lang);
+					break;
+				case "recoverEmail":
+					handleRecoverEmail(actionCode, lang);
+					break;
+				case "verifyEmail":
+					handleVerifyEmail(actionCode, continueUrl, lang);
+					break;
+				default:
+					handleNoMode();
+			}
+		},
+		false
+	);
+
+	function handleNoMode() {
+		console.log("Account action mode is invalid. Redirecting...");
+		window.location.replace("/");
+	}
+
+	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+	 *  RESET PASSWORD
+	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+	// Elements
+	const passwordReset_form = document.getElementById("password-reset-form");
+	const newPassword_field = document.getElementById("new-password");
+	const newPassword_message = document.getElementById("new-password-message");
+	const confirm_field = document.getElementById("confirm-password");
+	const confirm_message = document.getElementById("confirm-password-message");
+	const submitButton = document.getElementById("password-reset-submit");
+
+	// Event Listeners
+	newPassword_field.addEventListener("focusout", validatePasswordFields);
+	confirm_field.addEventListener("focusout", validatePasswordFields);
+	document.querySelectorAll(".password-visibility").forEach((element) => {
+		element.addEventListener("click", togglePasswordVisibility);
+	});
+	document.addEventListener("keyup", validateSubmitButton);
+
+	// Action handler for reset password
+	function handleResetPassword(actionCode) {
+		// Verify the password reset code is valid.
+		verifyPasswordResetCode(auth, actionCode)
+			.then(async (email) => {
+				showActionUI(passResetUI);
+				const newPassword = await newPasswordSubmit();
+
+				confirmPasswordReset(auth, actionCode, newPassword)
+					.then((resp) => {
+						// Password reset has been confirmed and new password updated.
+						showActionUI(passResetSuccessUI);
+						// TODO: If a continue URL is available, display a button which on
+						// click redirects the user back to the app via continueUrl with
+						// additional state determined from that URL's parameters.
+					})
+					.catch((error) => {
+						// Error occurred during confirmation. The code might have expired or the
+						// password is too weak.
+					});
+			})
+			.catch((error) => {
+				// Invalid or expired action code. Ask user to try to reset the password again
+				console.log(error.message);
+				showActionUI(passResetErrorUI);
+			});
+	}
+
+	// Wait for the password reset form to submit, then return a promise with the password
+	function newPasswordSubmit() {
+		return new Promise((resolve) => {
+			const listener = (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+
+				const newPassword = newPassword_field.value;
+				resolve(newPassword);
+			};
+			passwordReset_form.addEventListener("submit", listener);
+		});
+	}
+
+	// New Password Field
+	function validatePasswordFields() {
+		const new_value = newPassword_field.value;
+		const confirm_value = confirm_field.value;
+
+		if (new_value.length < 6 && new_value.length > 0) {
+			newPassword_message.innerText = "Passwords must be longer than 6 characters";
+			show(newPassword_message);
+		} else {
+			newPassword_message.innerText = "";
+			hide(newPassword_message);
+		}
+
+		if (new_value !== confirm_value && confirm_value !== "") {
+			confirm_message.innerText = "Confirm Password must match";
+			show(confirm_message);
+		} else {
+			confirm_message.innerText = "";
+			hide(confirm_message);
+		}
+	}
+
+	// Password Visibility Toggle
+	function togglePasswordVisibility() {
+		const toggleOn = this.querySelector(".toggle-on");
+		const toggleOff = this.querySelector(".toggle-off");
+		const field = findSiblingWithClass(this, "form_field");
+
+		if (isHidden(toggleOn)) {
+			show(toggleOn);
+			hide(toggleOff);
+			field.type = "text";
+		} else {
+			hide(toggleOn);
+			show(toggleOff);
+			field.type = "password";
+		}
+	}
+
+	// Submit Button
+	function validateSubmitButton() {
+		const newPass = newPassword_field.value;
+		const confirmPass = confirm_field.value;
+		if (newPass === confirmPass && newPass.length >= 6) {
+			submitButton.classList.remove("btn-disabled");
+			submitButton.disabled = false;
+		} else {
+			submitButton.disabled = true;
+			submitButton.classList.add("btn-disabled");
+		}
+	}
+
+	// Send Password Reset Email
+	const sentUI = document.getElementById("password-sent");
+	const sendButton = document.getElementById("password-reset-btn");
+	const resubmitForm = document.getElementById("password-reset-resubmit");
+	const resubmit_email_field = document.getElementById("password-reset-email");
+
+	resubmitForm.addEventListener("submit", sendPasswordReset, true);
+
+	function sendPasswordReset(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		sendButton.classList.add("btn-disabled");
+		sendButton.disabled = true;
+
+		const email = resubmit_email_field.value;
+
+		sendPasswordResetEmail(auth, email)
+			.then(() => {
+				// Password Reset Email Sent!
+				show(sentUI);
+			})
+			.catch((error) => {
+				sendButton.classList.remove("btn-disabled");
+				sendButton.disabled = false;
+				hide(sentUI);
+			});
+	}
+
+	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+	 *  RECOVER EMAIL
+	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+	function handleRecoverEmail() {
+		console.log("haven't handled recover email yet.");
+	}
+
+	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+	 *  EMAIL VERIFICATION
+	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+	// Elements
+	const sendVerificationBtn = document.getElementById("send-verification-btn");
+
+	function handleVerifyEmail(actionCode) {
+		// Try to apply the email verification code.
+		applyActionCode(auth, actionCode)
+			.then((resp) => {
+				console.log("Email has been verified.");
+				// Email address has been verified.
+				showActionUI(emailVerifiedUI);
+				// You could also provide the user with a link back to the app.
+				// TODO: If a continue URL is available, display a button which on
+				// click redirects the user back to the app via continueUrl with
+				// additional state determined from that URL's parameters.
+			})
+			.catch((error) => {
+				console.log("Error verifying email" + error.message);
+				showActionUI(emailVerifiedError);
+				sendVerificationBtn.addEventListener("click", sendVerificationEmail, true);
+			});
+	}
+
+	function sendVerificationEmail() {
+		if (auth.currentUser) sendEmailVerification(auth.currentUser);
+		else redirectToLogin();
+	}
+
+	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+	 *  HELPER FUNCTIONS
+	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+	function redirectToLogin() {
+		window.location.replace(window.location.origin + "/login");
+	}
+
+	function findSiblingWithClass(element, className) {
+		const sibs = element.parentNode.childNodes;
+		for (let index = 0; index < sibs.length; index++) {
+			if (sibs[index].classList.contains(className) && sibs[index] !== element) return sibs[index];
+		}
+		return null;
+	}
+
+	// Removes all other action handlers from the DOM
+	function showActionUI(actionUI) {
+		for (var i = 0; i < actionHandlerElements.length; i++) {
+			if (actionHandlerElements[i] === actionUI) {
+				show(actionHandlerElements[i]);
+			} else hide(actionHandlerElements[i]);
+		}
+	}
+
+	function show(element) {
+		element.style.display = "block";
+	}
+	function isVisible(element) {
+		return element.style.display === "block";
+	}
+	function hide(element) {
+		element.style.display = "none";
+	}
+	function isHidden(element) {
+		return element.style.display === "none" || element.style.display === "";
+	}
+</script>

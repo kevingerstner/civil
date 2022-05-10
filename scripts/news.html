@@ -1,0 +1,59 @@
+<script type="module">
+	import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
+	const functions = getFunctions();
+	const subscribeToNewsletter = httpsCallable(functions, "mailchimp-subscribeToNewsletter");
+
+	// Elements
+	const signupLocation = "News Page";
+	const newsletterForm = document.getElementById("newsletter-form");
+	const newsletterSuccess = document.getElementById("newsletter-form-success");
+	const newsletterError = document.getElementById("newsletter-form-error");
+	const errorMessage = document.getElementById("newsletter-form-error-message");
+
+	const newsletterSubmit = document.getElementById("newsletter-submit");
+	newsletterSubmit.addEventListener("click", subscribe);
+
+	function subscribe(event) {
+		event.preventDefault();
+		const email = document.getElementById("newsletter-email").value;
+		subscribeToNewsletter({ email: email, location: signupLocation })
+			.then((response) => {
+				// Hide the Form and Errors, and show the success message
+				newsletterSuccess.style.display = "block";
+				newsletterForm.style.display = "none";
+				newsletterError.style.display = "none";
+			})
+			.catch((error) => {
+				// Show the error message
+				console.log(error);
+				errorMessage.innerHTML = error;
+				newsletterForm.style.display = "block";
+				newsletterError.style.display = "block";
+			});
+	}
+</script>
+
+<script>
+	/* START Date */
+	var options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+	const date = new Date().toLocaleDateString("en-US", options);
+	document.querySelectorAll(".date").forEach((dateElement) => {
+		dateElement.innerHTML = date;
+	});
+	/* END Date */
+
+	/* START Article */
+	document.querySelectorAll(".article").forEach((article) => {
+		const hover = article.querySelector(".article_hover");
+		hover.style.display = "block";
+		if (hover) {
+			article.addEventListener("mouseover", (event) => {
+				hover.style.backgroundColor = "rgba(236,236,236,0.2)";
+			});
+			article.addEventListener("mouseout", (event) => {
+				hover.style.backgroundColor = "rgba(0,0,0,0)";
+			});
+		}
+	});
+	/* END Article */
+</script>

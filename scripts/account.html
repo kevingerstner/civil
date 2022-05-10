@@ -1,0 +1,65 @@
+<script type="module">
+	import { getAuth, updateProfile } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+	import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
+	const functions = getFunctions();
+	const getProfileData = httpsCallable(functions, "user-getProfileData");
+	const updateProfileData = httpsCallable(functions, "user-updateProfileData");
+
+	// Elements
+	const firstNameField = document.getElementById("first-name-field");
+	const lastNameField = document.getElementById("last-name-field");
+	const emailAddressField = document.getElementById("email-address-field");
+	const jobTitleField = document.getElementById("job-title-field");
+	const schoolNameField = document.getElementById("School-Name");
+	const schoolLocationField = document.getElementById("School-Location");
+	const submitButton = document.getElementById("submit-btn");
+	const profileForm = document.getElementById("personal-info");
+	const successMessage = document.getElementById("success");
+
+	// Events
+	profileForm.addEventListener("submit", updateUserProfile);
+
+	//UI
+	successMessage.style.display = "none";
+
+	const auth = getAuth();
+
+	function setUserProfile() {
+		getProfileData().then((res) => {
+			firstNameField.value = res.data.firstName;
+			lastNameField.value = res.data.lastName;
+			emailAddressField.value = res.data.email;
+			jobTitleField.value = res.data.jobTitle;
+			schoolNameField.value = res.data.schoolName;
+			schoolLocationField.value = res.data.location;
+		});
+	}
+
+	setUserProfile();
+
+	async function updateUserProfile(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		// UI
+		submitButton.classList.add("disabled");
+		submitButton.innerHTML = "Submitting...";
+		successMessage.style.display = "none";
+
+		const user = auth.currentUser;
+		if (!user) return;
+		await updateProfileData({
+			firstName: firstNameField.value,
+			lastName: lastNameField.value,
+			jobTitle: jobTitleField.value,
+			schoolName: schoolNameField.value,
+			location: schoolLocationField.value,
+		}).then((res) => {
+			successMessage.style.display = "block";
+		});
+
+		// UI
+		submitButton.classList.remove("disabled");
+		submitButton.innerHTML = "Save Changes";
+	}
+</script>

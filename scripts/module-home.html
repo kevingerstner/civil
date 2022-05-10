@@ -1,0 +1,38 @@
+<!-- START Module Navbar (Home Page)-->
+<script type="module" src="https://cdn.jsdelivr.net/combine/npm/lodash@4/unescape.min.js,npm/lodash@4"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+
+<script type="module">
+	var module_slug = "{{wf {&quot;path&quot;:&quot;slug&quot;,&quot;type&quot;:&quot;PlainText&quot;\} }}";
+	var module_name = _.unescape("{{wf {&quot;path&quot;:&quot;name&quot;,&quot;type&quot;:&quot;PlainText&quot;\} }}");
+
+	function setModulePageLink(id, stub) {
+		var pageLink = document.getElementById(id);
+		if (pageLink) pageLink.href = window.location.origin + stub + module_slug;
+	}
+
+	// Set the Backlink
+	var backLink = document.getElementById("module-back-nav-link");
+	if (backLink) backLink.href = window.location.origin + "/module-library";
+
+	// Set Module Page Links
+	setModulePageLink("terms-nav-link", "/terms/");
+	setModulePageLink("historical-brief-nav-link", "/historical-brief/");
+	setModulePageLink("narratives-nav-link", "/narratives/");
+	setModulePageLink("classroom-content-nav-link", "/classroom-content/");
+	setModulePageLink("activities-nav-link", "/activities-category/");
+
+	setModulePageLink("terms-block", "/terms/");
+	setModulePageLink("narratives-block", "/narratives/");
+	setModulePageLink("historical-brief-block", "/historical-brief/");
+	setModulePageLink("activities-block", "/activities-category/");
+	setModulePageLink("classroom-content-block", "/classroom-content/");
+
+	document.getElementById("module-name").innerText = module_name;
+
+	const quicklinks = document.getElementsByClassName("module-quicklink");
+	for (var i = 0; i < quicklinks.length; i++) {
+		if (quicklinks[i].href === window.location.href) quicklinks[i].classList.add("w--current");
+	}
+</script>
+<!-- END Module Navbar (Home Page)-->

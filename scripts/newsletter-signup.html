@@ -1,0 +1,39 @@
+<script type="module">
+	import {
+		getFunctions,
+		httpsCallable,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
+	const functions = getFunctions();
+	const subscribeToNewsletter = httpsCallable(functions, "mailchimp-subscribeToNewsletter");
+
+	// Elements
+	const signupLocation = "News Page";
+	const newsletterForm = document.getElementById("newsletter-form");
+	const newsletterSuccess = document.getElementById("newsletter-form-success");
+	const newsletterError = document.getElementById("newsletter-form-error");
+	const errorMessage = document.getElementById("newsletter-form-error-message");
+	const newsletterSubmit = document.getElementById("newsletter-submit");
+
+	newsletterForm.addEventListener("submit", subscribe);
+
+	function subscribe(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const email = document.getElementById("newsletter-email").value;
+		subscribeToNewsletter({ email: email, location: signupLocation })
+			.then((response) => {
+				// Hide the Form and Errors, and show the success message
+				newsletterSuccess.style.display = "block";
+				newsletterForm.style.display = "none";
+				newsletterError.style.display = "none";
+				dataLayer.push({ event: "newsletter_subscribe", email: email });
+			})
+			.catch((error) => {
+				// Show the error message
+				console.log(error);
+				errorMessage.innerHTML = error.message;
+				newsletterForm.style.display = "block";
+				newsletterError.style.display = "block";
+			});
+	}
+</script>

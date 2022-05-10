@@ -1,0 +1,14 @@
+{
+	"from": {
+		"collectionId": "users",
+		"allDescendants": false
+	},
+	"orderBy": [
+		{
+			"field": {
+				"fieldPath": "firstName"
+			},
+			"direction": "ASCENDING"
+		}
+	]
+}

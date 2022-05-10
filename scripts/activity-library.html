@@ -1,0 +1,18 @@
+<script type="module">
+	import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const auth = getAuth();
+
+	const activityButton = "activity-button";
+
+	onAuthStateChanged(auth, async (user) => {
+		if (!user) blockActivities("/access-denied/create-account");
+	});
+
+	function blockActivities(route) {
+		const activityButtons = document.getElementsByClassName(activityButton);
+		for (var i = 0; i < activityButtons.length; i++) {
+			activityButtons[i].href = route;
+		}
+	}
+</script>

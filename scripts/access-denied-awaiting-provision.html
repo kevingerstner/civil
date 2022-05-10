@@ -1,0 +1,16 @@
+<script type="module">
+	import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
+	import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const functions = getFunctions();
+	const isUserProvisioned = httpsCallable(functions, "user-isProvisioned");
+
+	const auth = getAuth();
+	onAuthStateChanged(auth, async (user) => {
+		// Get if the user is provisioned
+		let result = await isUserProvisioned();
+		let provisioned = result.data.provisioned;
+
+		if (provisioned) window.location.replace("/");
+	});
+</script>

@@ -1,0 +1,56 @@
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+		sendEmailVerification,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	// Events
+	document
+		.getElementById("send-email-verification-btn")
+		.addEventListener("click", resendVerificationEmail, true);
+
+	// Hide Email Verify Box
+	const emailVerifiedBoxSuccess = document.getElementById("email-verify");
+	emailVerifiedBoxSuccess.style.display = "none";
+
+	// Show Loader
+	const loader = document.getElementById("loader");
+	loader.style.display = "block";
+
+	const auth = getAuth();
+	onAuthStateChanged(auth, (user) => {
+		if (!user) window.location.replace("/login");
+		if (user.emailVerified) window.location.replace("/");
+
+		// Set email text to the user's email
+		[...document.getElementsByClassName("email")].forEach((emailText) => {
+			emailText.innerHTML = user.email;
+		});
+
+		// Send the verification email
+		sendEmailVerification(user)
+			.then(() => {
+				emailVerifiedBoxSuccess.style.display = "block";
+				loader.style.display = "none";
+			})
+			.catch((err) => {
+				if (err.code === "auth/too-many-requests") {
+					emailVerifiedBoxSuccess.style.display = "block";
+				} else {
+					emailVerifiedBoxSuccess.style.display = "none";
+					console.log(`Error sending verification email: ${err}`);
+				}
+				loader.style.display = "none";
+			});
+	});
+
+	function resendVerificationEmail(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		const auth = getAuth();
+		if (auth.currentUser) sendEmailVerification(auth.currentUser);
+		else window.location.replace("/login");
+	}
+</script>
