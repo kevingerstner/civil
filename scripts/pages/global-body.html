@@ -1,0 +1,115 @@
+<!-------------------------------------
+    Code to be added before </body> tag
+----------------------------------------->
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+		signOut,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	// Elements
+	const profileElement = document.getElementById("nav-username-dropdown");
+	const loginElement = document.getElementById("login-signup-block");
+	const signoutButton = document.getElementById("signout-btn");
+
+	// Pages accessible only to provisioned users
+	const privatePages = [];
+	// pages that are accessible to any authenticated user
+	const authenticatedPages = [
+		"/account",
+		"/articles/",
+		"/current-events/",
+		"/units/",
+		"/historical-brief",
+		"/narratives",
+		"/classroom-content",
+		"/activities-category",
+		"/contemporary-issues",
+	];
+
+	const auth = getAuth();
+	onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			// Send info to GTM
+			localStorage.setItem("uid", user.uid);
+			localStorage.setItem("email", user.email);
+			localStorage.setItem("name", user.displayName);
+
+			// Check if user is paid or not
+			let paid = false;
+			const idTokenResult = await user.getIdTokenResult();
+			paid = !!idTokenResult.claims.paid ? true : false;
+			console.log(idTokenResult.claims);
+
+			// ---- UI ----
+			if (profileElement) show(profileElement);
+			if (loginElement) hide(loginElement);
+			document.querySelectorAll(".username-text").forEach((element) => {
+				element.innerText = user.displayName;
+			});
+			if (paid) {
+				hide(document.getElementById("upgrade-btn"));
+				show(document.getElementById("manage-license-btn"));
+				hide(document.getElementById("pricing-nav-item"));
+			} else {
+				show(document.getElementById("upgrade-btn"));
+				hide(document.getElementById("manage-license-btn"));
+			}
+
+			// // Block private content for un-provisioned users
+			// if (isRoutePrivate() && !provisioned) {
+			// 	goToRoute("/access-denied/awaiting-provision");
+			// }
+		}
+		if (!user) {
+			if (loginElement) loginElement.style.display = "inline-block";
+			if (profileElement) profileElement.style.display = "none";
+			// If the route is protected in any way, redirect to access denied / create account
+			if (isRouteAuthenticated() || isRoutePrivate())
+				window.location.replace("/access-denied/create-account");
+		}
+	});
+
+	function isRoutePrivate() {
+		for (var i = 0; i < privatePages.length; i++) {
+			if (window.location.pathname.startsWith(privatePages[i])) {
+				// make sure this page isn't whitelisted to be protected
+				if (!isRouteProtected()) return true;
+			}
+		}
+		return false;
+	}
+
+	function isRouteAuthenticated() {
+		for (var i = 0; i < authenticatedPages.length; i++) {
+			if (window.location.pathname.startsWith(authenticatedPages[i])) return true;
+		}
+		return false;
+	}
+
+	function hide(element) {
+		if (element) element.style.display = "none";
+	}
+
+	function show(element) {
+		if (element) element.style.display = "block";
+	}
+
+	/**------------------------------
+	 * Logout
+	 **------------------------------*/
+	signoutButton?.addEventListener("click", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		signOut(auth)
+			.then(() => {
+				localStorage.removeItem("uid");
+				window.location.replace("/");
+			})
+			.catch((error) => {
+				console.log(error);
+			});
+	});
+</script>

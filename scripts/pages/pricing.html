@@ -1,0 +1,78 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+		signOut,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+	const auth = getAuth();
+	const apiUrl = "https://us-central1-civil-ed.cloudfunctions.net/api";
+
+	const monthlyText = document.getElementById("teacher-monthly");
+	const yearlyText = document.getElementById("teacher-yearly");
+	const priceUnitLabel = document.getElementById("teacher-price-unit-label");
+	const createAccountBtn = document.getElementById("create-account-btn");
+
+	document.querySelector("#teacher-price-switch").addEventListener("click", toggleTeacherPrice);
+
+	let teacherMonthly = false;
+	let checkoutData = {
+		uid: localStorage.getItem("uid"),
+		email: localStorage.getItem("email"),
+		line_items: [
+			{
+				price: null,
+				quantity: 1,
+			},
+		],
+	};
+
+	onAuthStateChanged(auth, (user) => {
+		if (user) {
+			if (createAccountBtn) createAccountBtn.style.display = "none";
+		}
+	});
+
+	document.querySelector("#bundle-purchase-btn").addEventListener("click", () => {
+		checkoutData.line_items[0].price = "price_1L4DTbG9RsT33C16St0OcQS8";
+		purchase();
+	});
+
+	document.querySelector("#teacher-purchase-btn").addEventListener("click", () => {
+		checkoutData.line_items[0].price = teacherMonthly
+			? "price_1L3tv3G9RsT33C167Z4eqWX2"
+			: "price_1L3tuhG9RsT33C16FuHhg7rT";
+		purchase();
+	});
+
+	function toggleTeacherPrice(event) {
+		// Change to Yearly
+		if (monthlyText.classList.contains("active")) {
+			teacherMonthly = false;
+			monthlyText.classList.remove("active");
+			yearlyText.classList.add("active");
+		}
+		// Change to Monthly Pricing
+		else {
+			teacherMonthly = true;
+			monthlyText.classList.add("active");
+			yearlyText.classList.remove("active");
+		}
+	}
+
+	async function purchase() {
+		if (auth.currentUser && localStorage.getItem("uid")) {
+			axios({
+				method: "post",
+				url: `${apiUrl}/stripe/checkout`,
+				data: checkoutData,
+			}).then((response) => {
+				if (response.data.url) window.location.href = response.data.url;
+			});
+		} else {
+			let url = new URL("/login", window.location.origin);
+			url.searchParams.append("continueURL", "/pay/pricing");
+			window.location.href = url;
+		}
+	}
+</script>

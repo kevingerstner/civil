@@ -1,10 +1,8 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script type="module">
-	import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
-	const functions = getFunctions();
-	const subscribeToNewsletter = httpsCallable(functions, "mailchimp-subscribeToNewsletter");
+	const SIGNUP_LOCATION = "News Page";
 
 	// Elements
-	const signupLocation = "News Page";
 	const newsletterForm = document.getElementById("newsletter-form");
 	const newsletterSuccess = document.getElementById("newsletter-form-success");
 	const newsletterError = document.getElementById("newsletter-form-error");
@@ -16,7 +14,12 @@
 	function subscribe(event) {
 		event.preventDefault();
 		const email = document.getElementById("newsletter-email").value;
-		subscribeToNewsletter({ email: email, location: signupLocation })
+
+		axios({
+			method: "post",
+			url: "https://us-central1-civil-ed.cloudfunctions.net/api/mailchimp/subscribe",
+			data: { email, location: SIGNUP_LOCATION },
+		})
 			.then((response) => {
 				// Hide the Form and Errors, and show the success message
 				newsletterSuccess.style.display = "block";

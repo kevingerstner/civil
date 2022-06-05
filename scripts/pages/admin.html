@@ -1,0 +1,88 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const auth = getAuth();
+	const apiURL = "https://us-central1-civil-ed.cloudfunctions.net/api";
+
+	onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			// Check if user is paid or not
+			const idTokenResult = await user.getIdTokenResult(true);
+			let admin = !!idTokenResult.claims.admin;
+			if (!admin) window.location.replace("/");
+		}
+		if (!user) {
+			window.location.replace("/");
+		}
+	});
+
+	document.getElementById("provision-user").addEventListener("submit", provisionUser);
+	document.getElementById("unprovision-user").addEventListener("submit", unprovisionUser);
+	document.getElementById("set-admin").addEventListener("submit", setAdmin);
+	document.getElementById("get-user-data").addEventListener("submit", getUserData);
+	document.getElementById("get-user-data-email").addEventListener("submit", getUserDataEmail);
+
+	async function setAdmin(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/grantAdmin", "post", { email }, null);
+	}
+
+	async function provisionUser(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/provisionUser", "post", { user: email }, null);
+	}
+
+	async function unprovisionUser(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/unprovisionUser", "post", { user: email }, null);
+	}
+
+	async function getUserData(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const uid = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/user", "get", null, { uid });
+	}
+
+	async function getUserDataEmail(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/user", "get", null, { email });
+	}
+
+	async function sendAdminRequest(event, endpoint, method, data, params) {
+		const formMessageBox = event.target.querySelector(".form-message_box");
+		const message = formMessageBox.querySelector(".message");
+		formMessageBox.style.display = "none";
+		const user = auth.currentUser;
+		let token = user && (await user.getIdToken(true));
+		axios({
+			method,
+			url: apiURL + endpoint,
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+			data,
+			params,
+		})
+			.then((res) => {
+				message.innerText = JSON.stringify(res.data, null, 4);
+				formMessageBox.style.display = "block";
+			})
+			.catch((err) => {
+				message.innerText = err.message;
+				formMessageBox.style.display = "block";
+			});
+	}
+</script>

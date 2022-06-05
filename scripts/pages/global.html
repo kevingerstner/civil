@@ -1,0 +1,47 @@
+<!------------------------------------
+    Code to be added before <head> tag
+---------------------------------------->
+<script>
+	window.dataLayer = window.dataLayer || [];
+	dataLayer.push({
+		uid: localStorage.getItem("uid"),
+		email: localStorage.getItem("email"),
+		name: localStorage.getItem("name"),
+	});
+</script>
+
+<!-- Google Tag Manager -->
+<script>
+	(function (w, d, s, l, i) {
+		w[l] = w[l] || [];
+		w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+		var f = d.getElementsByTagName(s)[0],
+			j = d.createElement(s),
+			dl = l != "dataLayer" ? "&l=" + l : "";
+		j.async = true;
+		j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+		f.parentNode.insertBefore(j, f);
+	})(window, document, "script", "dataLayer", "GTM-5LZ5V3H");
+</script>
+<!-- End Google Tag Manager -->
+
+<script type="module">
+	// Import the functions you need from the SDKs you need
+	import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
+	import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-analytics.js";
+	// Initialize Firebase
+	// Your web app's Firebase configuration
+	// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+	const firebaseConfig = {
+		apiKey: "AIzaSyBoe3mHhuN3H68GZSDfjVj4-7QoiYeLN_M",
+		authDomain: "civil-ed.firebaseapp.com",
+		projectId: "civil-ed",
+		storageBucket: "civil-ed.appspot.com",
+		messagingSenderId: "252877681191",
+		appId: "1:252877681191:web:f837d7fffffbf4f5591402",
+		measurementId: "G-M7C700TEL8",
+	};
+
+	const app = initializeApp(firebaseConfig);
+	const analytics = getAnalytics(app);
+</script>

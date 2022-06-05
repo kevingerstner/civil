@@ -7,7 +7,3 @@ typings/
 
 # Node.js dependency directory
 node_modules/
-/.runtimeconfig.json
-.env
-
-.DS_Store

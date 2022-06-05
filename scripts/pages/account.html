@@ -1,9 +1,10 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script type="module">
-	import { getAuth, updateProfile } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
-	import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
-	const functions = getFunctions();
-	const getProfileData = httpsCallable(functions, "user-getProfileData");
-	const updateProfileData = httpsCallable(functions, "user-updateProfileData");
+	import {
+		getAuth,
+		updateProfile,
+		onAuthStateChanged,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
 	// Elements
 	const firstNameField = document.getElementById("first-name-field");
@@ -23,19 +24,27 @@
 	successMessage.style.display = "none";
 
 	const auth = getAuth();
+	onAuthStateChanged(auth, (user) => {
+		if (user) setUserProfile();
+	});
 
-	function setUserProfile() {
-		getProfileData().then((res) => {
-			firstNameField.value = res.data.firstName;
-			lastNameField.value = res.data.lastName;
-			emailAddressField.value = res.data.email;
-			jobTitleField.value = res.data.jobTitle;
-			schoolNameField.value = res.data.schoolName;
-			schoolLocationField.value = res.data.location;
-		});
+	async function setUserProfile() {
+		const token = await auth.currentUser.getIdToken();
+		axios
+			.get(`https://us-central1-civil-ed.cloudfunctions.net/api/user/${auth.currentUser.uid}`, {
+				headers: {
+					authorization: `Bearer ${token}`,
+				},
+			})
+			.then((res) => {
+				firstNameField.value = res.data.firstName;
+				lastNameField.value = res.data.lastName;
+				emailAddressField.value = res.data.email;
+				jobTitleField.value = res.data.jobTitle;
+				schoolNameField.value = res.data.schoolName;
+				schoolLocationField.value = res.data.location;
+			});
 	}
-
-	setUserProfile();
 
 	async function updateUserProfile(event) {
 		event.preventDefault();
@@ -46,17 +55,29 @@
 		submitButton.innerHTML = "Submitting...";
 		successMessage.style.display = "none";
 
-		const user = auth.currentUser;
-		if (!user) return;
-		await updateProfileData({
+		const token = await auth.currentUser.getIdToken();
+
+		const body = {
 			firstName: firstNameField.value,
 			lastName: lastNameField.value,
 			jobTitle: jobTitleField.value,
 			schoolName: schoolNameField.value,
 			location: schoolLocationField.value,
-		}).then((res) => {
-			successMessage.style.display = "block";
-		});
+		};
+
+		axios
+			.post(
+				`https://us-central1-civil-ed.cloudfunctions.net/api/user/${auth.currentUser.uid}`,
+				body,
+				{
+					headers: {
+						authorization: `Bearer ${token}`,
+					},
+				}
+			)
+			.then((res) => {
+				successMessage.style.display = "block";
+			});
 
 		// UI
 		submitButton.classList.remove("disabled");

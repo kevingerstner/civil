@@ -1,3 +1,6 @@
+import * as express from "express";
+const router = express.Router();
+
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 const db = admin.firestore();
@@ -11,6 +14,105 @@ const mcApiKey = mailchimpConfig.api_key;
 const Mailchimp = require("mailchimp-api-v3");
 const mailchimp = new Mailchimp(mcApiKey);
 const listId = mailchimpConfig.audienceid;
+
+/* +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=
+ * SUBSCRIBE
+ * +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=*/
+router.post("/subscribe", async (req, res) => {
+	try {
+		const email = req.body.email;
+		const subscribeLocation = req.body.location;
+		const subscriberHash = md5(email.toLowerCase());
+
+		const mailchimpRoute = `lists/${listId}/members/${subscriberHash}`;
+
+		functions.logger.info("New subscriber: " + email);
+
+		try {
+			// If a response returns, this member is already in MailChimp.
+			const response = await mailchimp.get(`lists/${listId}/members/${subscriberHash}`);
+			// If the user isn't subscribed, subscribe them
+			if (response.status !== "subscribed") {
+				await mailchimp
+					.patch(mailchimpRoute, {
+						status: "subscribed",
+					})
+					.then(() => {
+						res.status(200).send("Subscribed successfully");
+					});
+			}
+			/* If the user does not have the Newsletter tag, add it.*/
+			await mailchimp
+				.post(mailchimpRoute + "/tags", {
+					tags: [{ name: "Newsletter", status: "active" }],
+				})
+				.then(() => {
+					res.status(200).send();
+				})
+				.catch((err: any) => {
+					res.status(400).send(err.message);
+				});
+		} catch (error: any) {
+			// if a 404 is returned, the user doesn't exist, and we can subscribe them.
+			if (error.status === 404) {
+				await mailchimp
+					.put(mailchimpRoute, {
+						email_address: email,
+						status: "subscribed",
+						tags: ["Newsletter"],
+						merge_fields: { SIGNUPLOC: subscribeLocation },
+					})
+					.then(() => {
+						res.status(200).send("Subscribed successfully");
+					})
+					.catch(() => {
+						res.status(400).send("That email is invalid. Please a real email address.");
+					});
+			}
+		}
+	} catch (error) {
+		res.status(400).send("An email must be sent to subscribe");
+	}
+});
+
+/**
+ * Triggers when a new user signs up. This function adds them to the Mailchimp Audience.
+ */
+exports.addNewUserToMailChimp = functions.auth.user().onCreate(async (user) => {
+	const userDoc = await db.collection("users").doc(user.uid).get();
+	if (userDoc.exists) {
+		const userData = userDoc.data();
+		if (userData) {
+			const { email, newsletter, firstName, lastName } = userData;
+			// If the user selected the "subscribe to newsletter" when signing up, they will get the Newsletter tag.
+			const tags = newsletter ? ["Civil Account", "Newsletter"] : ["Civil Account"];
+			const subscriberHash = md5(email.toLowerCase());
+			const mergeFields = {
+				FNAME: firstName,
+				LNAME: lastName,
+				SIGNUPLOC: "Signup Form",
+			};
+
+			functions.logger.info(
+				email + (newsletter ? " subscribed to newsletter" : "did not subscribe")
+			);
+
+			await mailchimp
+				.put(`lists/${listId}/members/${subscriberHash}`, {
+					email_address: email,
+					status: "subscribed",
+					tags,
+					merge_fields: mergeFields,
+				})
+				.catch(() => {
+					throw new functions.https.HttpsError(
+						"invalid-argument",
+						"That email is invalid. Please a real email address."
+					);
+				});
+		}
+	}
+});
 
 /** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  * Send Campaigns
@@ -55,110 +157,4 @@ const listId = mailchimpConfig.audienceid;
 //   console.log(response);
 // }
 
-/** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
- * Manage Audience
- * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=*/
-
-/**
- * Triggers when a new user signs up. This function adds them to the Mailchimp Audience.
- */
-exports.addNewUserToMailChimp = functions.auth.user().onCreate(async (user) => {
-  const userDoc = await db.collection("users").doc(user.uid).get();
-  if (userDoc.exists) {
-    const userData = userDoc.data();
-    if (userData) {
-      const {email, newsletter, firstName, lastName} = userData;
-      // If the user selected the "subscribe to newsletter" when signing up, they will get the Newsletter tag.
-      const tags = newsletter ? ["Civil Account", "Newsletter"] : ["Civil Account"];
-      const subscriberHash = md5(email.toLowerCase());
-      const mergeFields = {
-        FNAME: firstName,
-        LNAME: lastName,
-        SIGNUPLOC: "Signup Form",
-      };
-
-      functions.logger.info(
-          email + (newsletter ? " subscribed to newsletter" : "did not subscribe")
-      );
-
-      // Add the user to Mailchimp Audience
-      subscribeUser(subscriberHash, email, tags, mergeFields);
-    }
-  }
-});
-
-/**
- * Subscribes a user to the newsletter
- * @param {string} email The email from the signup form
- */
-exports.subscribeToNewsletter = functions.https.onCall(async (data, context) => {
-  if (!data.email) {
-    functions.logger.error("function not called with email");
-    throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The function must be called with one argument \"email\" containing the email to subscribe."
-    );
-  }
-  const subscriberHash = md5(data.email.toLowerCase());
-
-  functions.logger.info("Subscribe Location: " + data.location);
-  functions.logger.info("EMAIL: " + data.email);
-
-  try {
-    // If a valid response returns, this member is already in MailChimp.
-    const response = await mailchimp.get(`lists/${listId}/members/${subscriberHash}`);
-    // If the user isn't subscribed, subscribe them
-    if (response.status !== "subscribed") {
-      await mailchimp
-          .patch(`lists/${listId}/members/${subscriberHash}`, {
-            status: "subscribed",
-          })
-          .then(() => {
-            functions.logger.info(
-                "Updated " + response.status + " user " + data.email + " to subscribed."
-            );
-          })
-          .catch((error: any) => {
-            functions.logger.error(error);
-          });
-    }
-    /* If the user does not have the Newsletter tag, add it.*/
-    await mailchimp
-        .post(`lists/${listId}/members/${subscriberHash}/tags`, {
-          tags: [{name: "Newsletter", status: "active"}],
-        })
-        .catch((error: any) => {
-          functions.logger.error(error);
-        });
-  } catch (error: any) {
-    // if a 404 is returned, the user doesn't exist, and we can subscribe them.
-    if (error.status === 404) {
-      functions.logger.info("User not found. Adding them to the audience.");
-      const mergeFields = {SIGNUPLOC: data.location};
-      subscribeUser(subscriberHash, data.email, ["Newsletter"], mergeFields);
-    }
-  }
-});
-
-/**
- * Subscribes a user to the Mailchimp Audience
- * @param {any} subscriberHash The md5 hash for the user
- * @param {string} email The user's email
- * @param {string} tags An array of strings of tags
- * @param {any} mergeFields An object containing the merge fields for the user
- */
-async function subscribeUser(subscriberHash: any, email: string, tags: string[], mergeFields: any) {
-  await mailchimp
-      .put(`lists/${listId}/members/${subscriberHash}`, {
-        email_address: email,
-        status: "subscribed",
-        tags,
-        merge_fields: mergeFields,
-      })
-      .catch((error: any) => {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "That email is invalid. Please a real email address."
-        );
-      });
-}
+export default router;

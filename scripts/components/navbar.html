@@ -1,3 +1,53 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script type="module">
+	import { getAuth } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const auth = getAuth();
+	const stripePortalURL = "https://us-central1-civil-ed.cloudfunctions.net/api";
+
+	document.querySelector("#manage-license-btn").addEventListener("click", async () => {
+		const user = auth.currentUser;
+		let token = user && (await user.getIdToken(true));
+		axios({
+			method: "post",
+			url: stripePortalURL + "/stripe/create-customer-portal-session",
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+		})
+			.then((res) => {
+				window.location.href = res.data.url;
+			})
+			.catch((err) => {
+				console.log(err);
+			});
+	});
+</script>
+
+<!-- START Dropdown -->
+<script>
+	document.querySelectorAll(".dropdown").forEach((dropdown) => {
+		const dropdownHeader = dropdown.querySelector(".dropdown_header");
+		const dropdownContent = dropdown.querySelector(".dropdown_content");
+		const dropdownIcon = dropdown.querySelector(".dropdown_icon");
+
+		dropdownContent.style.maxHeight = 0;
+
+		dropdownHeader.addEventListener("click", (event) => {
+			if (dropdownContent.style.maxHeight === "0px") {
+				dropdownContent.style.maxHeight = "100vh";
+				dropdownIcon.style.transform = "rotateX(180deg)";
+				dropdownHeader.classList.remove("closed");
+			} else {
+				dropdownContent.style.maxHeight = "0px";
+				dropdownIcon.style.transform = "rotateX(0deg)";
+				dropdownHeader.classList.add("closed");
+			}
+		});
+	});
+</script>
+<!-- END Dropdown-->
+
 <!-- START Hover Dropdown -->
 <style>
 	.dropdown_content {
@@ -9,12 +59,6 @@
 	}
 	.dropdown_link_overlay {
 		display: block;
-	}
-	.dropdown_icon {
-		transform: rotateX(0deg);
-	}
-	.dropdown:hover .dropdown_icon {
-		transform: rotateX(180deg);
 	}
 </style>
 <!-- END Hover Dropdown-->
