@@ -18,7 +18,6 @@
 	// pages that are accessible to any authenticated user
 	const authenticatedPages = [
 		"/account",
-		"/articles/",
 		"/current-events/",
 		"/units/",
 		"/historical-brief",
@@ -65,6 +64,10 @@
 		if (!user) {
 			if (loginElement) loginElement.style.display = "inline-block";
 			if (profileElement) profileElement.style.display = "none";
+
+			localStorage.removeItem("uid");
+			localStorage.removeItem("email");
+			localStorage.removeItem("name");
 			// If the route is protected in any way, redirect to access denied / create account
 			if (isRouteAuthenticated() || isRoutePrivate())
 				window.location.replace("/access-denied/create-account");
@@ -106,6 +109,7 @@
 		signOut(auth)
 			.then(() => {
 				localStorage.removeItem("uid");
+				localStorage.removeItem("articles-viewed");
 				window.location.replace("/");
 			})
 			.catch((error) => {

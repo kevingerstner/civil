@@ -1,0 +1,64 @@
+<script>
+	const CONTENT_ELEMENT = document.getElementById("content");
+	const HEADING_LEVEL = "h2";
+	const TOC_ELEMENT = "#toc";
+	const TOC_ITEM_CLASSNAME = "toc-dark-class_item";
+	const TOC_ITEM_NUM_CLASSNAME = "toc-class_item_num";
+	const TOC_ACTIVE_CLASSNAME = "toc-active";
+	const SECTION_ELEMENT = ".unit_section";
+	const ANCHOR_CLASSNAME = "section-anchor";
+
+	const observer = new IntersectionObserver((entries) => {
+		for (let index = entries.length - 1; index >= 0; index--) {
+			const id = entries[index].target.getAttribute("id");
+			//if (!entry.isIntersecting) console.log(id + "is not intersecting");
+			if (entries[index].isIntersecting) {
+				document.querySelectorAll(".toc-active").forEach((activeElement) => {
+					activeElement.classList.remove("toc-active");
+				});
+				document.querySelector(`a[href="#${id}"]`).classList.add("toc-active");
+			}
+		}
+	});
+	window.onload = function () {
+		let sectionCount = 0;
+		CONTENT_ELEMENT.querySelectorAll(HEADING_LEVEL).forEach((heading, i) => {
+			// skip hidden headings
+			if (heading.closest(SECTION_ELEMENT).classList.contains("w-condition-invisible")) return;
+
+			observer.observe(heading);
+			//heading.setAttribute("id", "toc-" + i); // give each h2 a unique id
+			let str = heading.innerHTML; // adds section titles to slugs
+			str = str
+				.replace(/\s+/g, "-")
+				.replace(/[°&\/\\#,+()$~%.'":;*?<>{}]/g, "")
+				.toLowerCase(); // replaces spaces with hyphens, removes special characters and extra spaces from the headings, and applies lowercase in slugs
+			heading.setAttribute("id", str); // gives each heading a unique id
+
+			// Create Anchor
+			const anchor = document.createElement("a");
+			anchor.classList.add(ANCHOR_CLASSNAME);
+			anchor.setAttribute("id", str); // set the id to the title from the header
+			heading.parentNode.insertBefore(anchor, heading);
+
+			// Create TOC items
+			const item = document.createElement("a"); // creates an anchor element called "item" for each h2
+			item.classList.add(TOC_ITEM_CLASSNAME); // gives each item the correct class
+			if (i === 0) item.classList.add(TOC_ACTIVE_CLASSNAME); // set first item to active
+			item.setAttribute("href", "#" + str); // gives each item the correct anchor link
+			document.querySelector(TOC_ELEMENT).appendChild(item); // places each item inside the Table of Contents div
+
+			// Item Number
+			const itemNum = document.createElement("span");
+			itemNum.setAttribute("class", TOC_ITEM_NUM_CLASSNAME);
+			sectionCount++;
+			itemNum.innerHTML = `${sectionCount}.`;
+			item.appendChild(itemNum);
+
+			// Item Name
+			const itemName = document.createElement("span");
+			itemName.innerHTML = heading.innerHTML; // gives each item the text of the corresponding heading
+			item.appendChild(itemName);
+		});
+	};
+</script>
