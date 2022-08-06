@@ -43,7 +43,3 @@ $(window).scroll(function () {
 		localStorage.setItem("articles-viewed", articleCookie.toString());
 	}
 });
-
-function clearCookie() {
-	localStorage.removeItem("articles-viewed");
-}

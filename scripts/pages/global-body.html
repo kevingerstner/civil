@@ -13,18 +13,18 @@
 	const loginElement = document.getElementById("login-signup-block");
 	const signoutButton = document.getElementById("signout-btn");
 
-	// Pages accessible only to provisioned users
-	const privatePages = [];
+	const ACCESS_DENIED_URL = "/pay/pricing";
+	// Pages accessible only to paid users
+	const privatePages = ["/current-events/", "/units/"];
 	// pages that are accessible to any authenticated user
-	const authenticatedPages = [
-		"/account",
-		"/current-events/",
-		"/units/",
-		"/historical-brief",
-		"/narratives",
-		"/classroom-content",
-		"/activities-category",
-		"/contemporary-issues",
+	const authenticatedPages = ["/account"];
+	const allowList = [
+		"/current-events/electoral-college-vs-popular-vote",
+		"/units/unit-1-foundations-of-american-democracy",
+		"/units/unit-2-interactions-among-branches-of-government",
+		"/units/unit-3-civil-liberties-and-civil-rights",
+		"/units/unit-4-american-political-ideologies-and-beliefs",
+		"/units/unit-5-political-participation",
 	];
 
 	const auth = getAuth();
@@ -36,10 +36,22 @@
 			localStorage.setItem("name", user.displayName);
 
 			// Check if user is paid or not
-			let paid = false;
-			const idTokenResult = await user.getIdTokenResult();
-			paid = !!idTokenResult.claims.paid ? true : false;
-			console.log(idTokenResult.claims);
+			user.getIdTokenResult().then((idTokenResult) => {
+				const paid = !!idTokenResult.claims.paid ? true : false;
+				console.log(idTokenResult.claims);
+				if (paid) {
+					hide(document.getElementById("upgrade-btn"));
+					show(document.getElementById("manage-license-btn"));
+					hide(document.getElementById("pricing-nav-item"));
+				} else {
+					show(document.getElementById("upgrade-btn"));
+					hide(document.getElementById("manage-license-btn"));
+				}
+				// Block private content for unpaid users
+				if (isRoutePrivate() && !idTokenResult.claims.admin) {
+					if (!idTokenResult.claims.admin && !paid) window.location.replace(ACCESS_DENIED_URL);
+				}
+			});
 
 			// ---- UI ----
 			if (profileElement) show(profileElement);
@@ -47,19 +59,6 @@
 			document.querySelectorAll(".username-text").forEach((element) => {
 				element.innerText = user.displayName;
 			});
-			if (paid) {
-				hide(document.getElementById("upgrade-btn"));
-				show(document.getElementById("manage-license-btn"));
-				hide(document.getElementById("pricing-nav-item"));
-			} else {
-				show(document.getElementById("upgrade-btn"));
-				hide(document.getElementById("manage-license-btn"));
-			}
-
-			// // Block private content for un-provisioned users
-			// if (isRoutePrivate() && !provisioned) {
-			// 	goToRoute("/access-denied/awaiting-provision");
-			// }
 		}
 		if (!user) {
 			if (loginElement) loginElement.style.display = "inline-block";
@@ -69,8 +68,7 @@
 			localStorage.removeItem("email");
 			localStorage.removeItem("name");
 			// If the route is protected in any way, redirect to access denied / create account
-			if (isRouteAuthenticated() || isRoutePrivate())
-				window.location.replace("/access-denied/create-account");
+			if (isRouteAuthenticated() || isRoutePrivate()) window.location.replace(ACCESS_DENIED_URL);
 		}
 	});
 
@@ -78,7 +76,7 @@
 		for (var i = 0; i < privatePages.length; i++) {
 			if (window.location.pathname.startsWith(privatePages[i])) {
 				// make sure this page isn't whitelisted to be protected
-				if (!isRouteProtected()) return true;
+				if (!isRouteAuthenticated() && !isRouteOnAllowList()) return true;
 			}
 		}
 		return false;
@@ -87,6 +85,13 @@
 	function isRouteAuthenticated() {
 		for (var i = 0; i < authenticatedPages.length; i++) {
 			if (window.location.pathname.startsWith(authenticatedPages[i])) return true;
+		}
+		return false;
+	}
+
+	function isRouteOnAllowList() {
+		for (var i = 0; i < allowList.length; i++) {
+			if (window.location.pathname.startsWith(allowList[i])) return true;
 		}
 		return false;
 	}
@@ -112,8 +117,6 @@
 				localStorage.removeItem("articles-viewed");
 				window.location.replace("/");
 			})
-			.catch((error) => {
-				console.log(error);
-			});
+			.catch((error) => console.log(error));
 	});
 </script>

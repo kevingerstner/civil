@@ -31,9 +31,9 @@ import user from "./userFunctions";
 import mailchimp from "./mailchimpFunctions";
 import adminFx from "./adminFunctions";
 import stripe from "./stripeFunctions";
+import adminSchools from "./adminSchools";
 exports.mailchimp = require("./mailchimpFunctions");
 exports.user = require("./userFunctions");
-import { provisionUser } from "./userFunctions";
 exports.database = require("./uploadSchoolsData");
 exports.stripe = require("./stripeFunctions");
 
@@ -50,6 +50,7 @@ app.use("/user", user);
 app.use("/mailchimp", mailchimp);
 app.use("/stripe", stripe);
 app.use("/admin", adminFx);
+app.use("/admin-schools", adminSchools);
 
 exports.api = functions.https.onRequest(app);
 
@@ -71,27 +72,6 @@ const slackApp = new App({
 slackApp.error(async (error) => {
 	console.error(error);
 	functions.logger.error(error);
-});
-
-slackApp.action("provision-account", async ({ ack, payload, respond }) => {
-	await ack();
-
-	const fields = JSON.parse((payload as any).value);
-	const email: string = fields.email;
-
-	try {
-		await provisionUser(email);
-
-		await respond({
-			replace_original: true,
-			text: `Successfully provisioned the account for ${email}`,
-		});
-	} catch (err) {
-		functions.logger.error(err);
-		await respond({
-			text: (err as any).message,
-		});
-	}
 });
 
 /**
@@ -165,57 +145,6 @@ exports.postSignupNotificationToSlack = functions.auth.user().onCreate(async (us
 						{
 							type: "mrkdwn",
 							text: `*Referral:*\n${referral}`,
-						},
-					],
-				},
-				{
-					type: "actions",
-					elements: [
-						{
-							type: "button",
-							text: {
-								type: "plain_text",
-								text: "Provision Account",
-							},
-							action_id: "provision-account",
-							style: "primary",
-							value: JSON.stringify({
-								email,
-								firstName,
-								lastName,
-								jobTitle,
-								schoolName,
-								location,
-								referral,
-							}),
-							confirm: {
-								title: {
-									type: "plain_text",
-									text: "Confirm Provision",
-								},
-								text: {
-									type: "plain_text",
-									text: `You're about to create an account for ${email}. Would you like to do this?`,
-								},
-								confirm: {
-									type: "plain_text",
-									text: "Provision Account",
-								},
-								deny: {
-									type: "plain_text",
-									text: "Go Back",
-								},
-							},
-						},
-						{
-							type: "button",
-							text: {
-								type: "plain_text",
-								text: "Deny Provision",
-							},
-							action_id: "deny-provision",
-							style: "danger",
-							url: `mailto:${email}`,
 						},
 					],
 				},

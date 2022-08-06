@@ -1,0 +1,37 @@
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const SLIDES_EMBED = document.querySelector("#slides-embed");
+	const SLIDES_BTN = document.querySelector("#slides-btn");
+	const QUESTIONS_CONTENT = document.querySelector("#questions-content");
+
+	const QUESTIONS_DENIED = document.querySelector("#questions-denied");
+	const SLIDES_DENIED = document.querySelector("#slides-denied");
+
+	SLIDES_DENIED.style.display = "none";
+	QUESTIONS_DENIED.style.display = "none";
+
+	const auth = getAuth();
+	onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			user.getIdTokenResult().then((idTokenResult) => {
+				if (!idTokenResult.claims.paid && !idTokenResult.claims.admin) {
+					hidePaidContent();
+				}
+			});
+		} else {
+			hidePaidContent();
+		}
+	});
+
+	function hidePaidContent() {
+		SLIDES_EMBED.remove();
+		SLIDES_BTN.remove();
+		QUESTIONS_CONTENT.remove();
+		SLIDES_DENIED.style.display = "block";
+		QUESTIONS_DENIED.style.display = "block";
+	}
+</script>

@@ -25,43 +25,40 @@
 	document.getElementById("set-admin").addEventListener("submit", setAdmin);
 	document.getElementById("get-user-data").addEventListener("submit", getUserData);
 	document.getElementById("get-user-data-email").addEventListener("submit", getUserDataEmail);
+	document.getElementById("get-school-lookup").addEventListener("submit", getSchoolLookupData);
 
 	async function setAdmin(event) {
-		event.preventDefault();
-		event.stopPropagation();
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/grantAdmin", "post", { email }, null);
 	}
 
 	async function provisionUser(event) {
-		event.preventDefault();
-		event.stopPropagation();
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/provisionUser", "post", { user: email }, null);
 	}
 
 	async function unprovisionUser(event) {
-		event.preventDefault();
-		event.stopPropagation();
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/unprovisionUser", "post", { user: email }, null);
 	}
 
 	async function getUserData(event) {
-		event.preventDefault();
-		event.stopPropagation();
 		const uid = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/user", "get", null, { uid });
 	}
 
 	async function getUserDataEmail(event) {
-		event.preventDefault();
-		event.stopPropagation();
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/user", "get", null, { email });
 	}
 
+	async function getSchoolLookupData(event) {
+		sendAdminRequest(event, "/admin-schools/schoolLookup", "get", null, null);
+	}
+
 	async function sendAdminRequest(event, endpoint, method, data, params) {
+		event.preventDefault();
+		event.stopPropagation();
 		const formMessageBox = event.target.querySelector(".form-message_box");
 		const message = formMessageBox.querySelector(".message");
 		formMessageBox.style.display = "none";

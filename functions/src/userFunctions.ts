@@ -84,48 +84,6 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 		});
 });
 
-exports.updateProfileData = functions.https.onCall(async (data, context) => {
-	if (!context.auth) return;
-	const userDocRef = db.collection("users").doc(context.auth.uid);
-	userDocRef
-		.update({
-			firstName: data.firstName,
-			lastName: data.lastName,
-			schoolName: data.schoolName,
-			location: data.location,
-			jobTitle: data.jobTitle,
-		})
-		.then((result) => {
-			console.log("Success: Updated user information", result);
-			return null;
-		})
-		.catch((err) => {
-			console.log("Could not update user's information", err);
-			return null;
-		});
-});
-
-/**
- * Provision a user. When provisioned, a user has access to Civil's content.
- * @param {string} email The email of the user who we want to provision
- * @return {Promise<void>} null
- */
-export async function provisionUser(email: string): Promise<void> {
-	const snapshot = await admin
-		.firestore()
-		.collection("users")
-		.where("email", "==", email)
-		.limit(1)
-		.get();
-	if (!snapshot.empty) {
-		const userDoc = snapshot.docs[0].ref;
-		await userDoc.update({ provisioned: true });
-	} else {
-		functions.logger.log("No user with that email could be found.");
-		return;
-	}
-}
-
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  CLAIMS
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */

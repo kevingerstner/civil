@@ -34,14 +34,16 @@
 	});
 
 	document.querySelector("#bundle-purchase-btn").addEventListener("click", () => {
-		checkoutData.line_items[0].price = "price_1L4DTbG9RsT33C16St0OcQS8";
+		const bundle_price = event.target.getAttribute("data-price");
+		checkoutData.line_items[0].price = bundle_price;
 		purchase();
 	});
 
 	document.querySelector("#teacher-purchase-btn").addEventListener("click", () => {
-		checkoutData.line_items[0].price = teacherMonthly
-			? "price_1L3tv3G9RsT33C167Z4eqWX2"
-			: "price_1L3tuhG9RsT33C16FuHhg7rT";
+		const monthly_price = event.target.getAttribute("data-price-monthly");
+		const yearly_price = event.target.getAttribute("data-price-annual");
+
+		checkoutData.line_items[0].price = teacherMonthly ? monthly_price : yearly_price;
 		purchase();
 	});
 

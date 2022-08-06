@@ -14,7 +14,7 @@
 	// UI
 	const emailVerifiedUI = document.getElementById("email-verified");
 	const emailVerifiedError = document.getElementById("email-verified-error");
-	const passResetUI = document.getElementById("password-reset-ui");
+	const passResetUI = document.getElementById("password-reset");
 	const passResetSuccessUI = document.getElementById("password-reset-success-ui");
 	const passResetErrorUI = document.getElementById("password-reset-error-ui");
 
@@ -26,45 +26,62 @@
 		passResetErrorUI,
 	];
 
-	document.addEventListener(
-		"DOMContentLoaded",
-		() => {
-			const queryString = window.location.search;
-			const urlParams = new URLSearchParams(queryString);
+	const urlParams = new URLSearchParams(window.location.search);
 
-			// Get the Action to complete
-			const mode = urlParams.get("mode");
-			// Get the one-time code
-			const actionCode = urlParams.get("oobCode");
-			// (Optional) Get the continue URL from the query parmeter, if available
-			const continueUrl = urlParams.has("continueUrl") ? urlParams.get("continueUrl") : "";
-			// (Optional) Get the language code if available.
-			const lang = urlParams.has("lang") ? urlParams.get("lang") : "en";
+	const mode = urlParams.get("mode");
+	const actionCode = urlParams.get("oobCode");
+	// (Optional) Get the continue URL from the query parmeter, if available
+	const continueUrl = urlParams.has("continueUrl") ? urlParams.get("continueUrl") : "";
+	// (Optional) Get the language code if available.
+	const lang = urlParams.has("lang") ? urlParams.get("lang") : "en";
 
-			switch (mode) {
-				case "resetPassword":
-					handleResetPassword(actionCode, continueUrl, lang);
-					break;
-				case "recoverEmail":
-					handleRecoverEmail(actionCode, lang);
-					break;
-				case "verifyEmail":
-					handleVerifyEmail(actionCode, continueUrl, lang);
-					break;
-				default:
-					handleNoMode();
-			}
-		},
-		false
-	);
+	switch (mode) {
+		case "resetPassword":
+			handleResetPassword();
+			break;
+		case "recoverEmail":
+			handleRecoverEmail();
+			break;
+		case "verifyEmail":
+			handleVerifyEmail();
+			break;
+		default:
+			handleNoMode();
+	}
 
 	function handleNoMode() {
-		console.log("Account action mode is invalid. Redirecting...");
 		window.location.replace("/");
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
-	 *  RESET PASSWORD
+	 *  EMAIL VERIFICATION
+	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+	// Elements
+	const resendVerificationBtn = document.querySelector("#send-verification-btn");
+	const continueBtn = document.querySelector("#email-verified-continue");
+
+	function handleVerifyEmail() {
+		applyActionCode(auth, actionCode)
+			.then((resp) => {
+				// Email address has been verified.
+				showActionUI(emailVerifiedUI);
+				if (continueUrl) continueBtn.href = continueUrl;
+			})
+			.catch((error) => {
+				console.log("Error verifying email" + error.message);
+				showActionUI(emailVerifiedError);
+				resendVerificationBtn.addEventListener("click", resendVerificationEmail);
+			});
+	}
+
+	function resendVerificationEmail() {
+		if (auth.currentUser) sendEmailVerification(auth.currentUser);
+		else redirectToLogin();
+	}
+
+	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+	 *  CREATE NEW PASSWORD
 	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 	// Elements
 	const passwordReset_form = document.getElementById("password-reset-form");
@@ -73,6 +90,9 @@
 	const confirm_field = document.getElementById("confirm-password");
 	const confirm_message = document.getElementById("confirm-password-message");
 	const submitButton = document.getElementById("password-reset-submit");
+
+	hide(newPassword_message);
+	hide(confirm_message);
 
 	// Event Listeners
 	newPassword_field.addEventListener("focusout", validatePasswordFields);
@@ -83,25 +103,11 @@
 	document.addEventListener("keyup", validateSubmitButton);
 
 	// Action handler for reset password
-	function handleResetPassword(actionCode) {
-		// Verify the password reset code is valid.
+	function handleResetPassword() {
 		verifyPasswordResetCode(auth, actionCode)
 			.then(async (email) => {
 				showActionUI(passResetUI);
-				const newPassword = await newPasswordSubmit();
-
-				confirmPasswordReset(auth, actionCode, newPassword)
-					.then((resp) => {
-						// Password reset has been confirmed and new password updated.
-						showActionUI(passResetSuccessUI);
-						// TODO: If a continue URL is available, display a button which on
-						// click redirects the user back to the app via continueUrl with
-						// additional state determined from that URL's parameters.
-					})
-					.catch((error) => {
-						// Error occurred during confirmation. The code might have expired or the
-						// password is too weak.
-					});
+				passwordReset_form.addEventListener("submit", passwordChangeSubmit);
 			})
 			.catch((error) => {
 				// Invalid or expired action code. Ask user to try to reset the password again
@@ -110,18 +116,20 @@
 			});
 	}
 
-	// Wait for the password reset form to submit, then return a promise with the password
-	function newPasswordSubmit() {
-		return new Promise((resolve) => {
-			const listener = (event) => {
-				event.preventDefault();
-				event.stopPropagation();
+	// Submits the password change request to the server
+	function passwordChangeSubmit(event) {
+		event.preventDefault();
+		event.stopPropagation();
 
-				const newPassword = newPassword_field.value;
-				resolve(newPassword);
-			};
-			passwordReset_form.addEventListener("submit", listener);
-		});
+		const newPassword = newPassword_field.value;
+
+		confirmPasswordReset(auth, actionCode, newPassword)
+			.then((resp) => {
+				showActionUI(passResetSuccessUI);
+			})
+			.catch((error) => {
+				showActionUI(passResetErrorUI);
+			});
 	}
 
 	// New Password Field
@@ -148,6 +156,7 @@
 
 	// Password Visibility Toggle
 	function togglePasswordVisibility() {
+		console.log("ACTION TRIGGER");
 		const toggleOn = this.querySelector(".toggle-on");
 		const toggleOff = this.querySelector(".toggle-off");
 		const field = findSiblingWithClass(this, "form_field");
@@ -165,9 +174,7 @@
 
 	// Submit Button
 	function validateSubmitButton() {
-		const newPass = newPassword_field.value;
-		const confirmPass = confirm_field.value;
-		if (newPass === confirmPass && newPass.length >= 6) {
+		if (newPassword_field.value === confirm_field.value && newPassword_field.value.length >= 6) {
 			submitButton.classList.remove("btn-disabled");
 			submitButton.disabled = false;
 		} else {
@@ -177,31 +184,31 @@
 	}
 
 	// Send Password Reset Email
-	const sentUI = document.getElementById("password-sent");
+	const successMessage = document.getElementById("password-sent");
 	const sendButton = document.getElementById("password-reset-btn");
 	const resubmitForm = document.getElementById("password-reset-resubmit");
 	const resubmit_email_field = document.getElementById("password-reset-email");
+	const passwordResetMessage = document.getElementById("password-reset-message");
 
-	resubmitForm.addEventListener("submit", sendPasswordReset, true);
+	hide(successMessage);
+	resubmitForm.addEventListener("submit", resendPasswordReset, true);
 
-	function sendPasswordReset(event) {
+	function resendPasswordReset(event) {
 		event.preventDefault();
 		event.stopPropagation();
 
 		sendButton.classList.add("btn-disabled");
 		sendButton.disabled = true;
 
-		const email = resubmit_email_field.value;
-
-		sendPasswordResetEmail(auth, email)
+		sendPasswordResetEmail(auth, resubmit_email_field.value)
 			.then(() => {
-				// Password Reset Email Sent!
-				show(sentUI);
+				show(successMessage);
 			})
 			.catch((error) => {
 				sendButton.classList.remove("btn-disabled");
 				sendButton.disabled = false;
-				hide(sentUI);
+				passwordResetMessage.innerText = error.message;
+				hide(successMessage);
 			});
 	}
 
@@ -211,37 +218,6 @@
 
 	function handleRecoverEmail() {
 		console.log("haven't handled recover email yet.");
-	}
-
-	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
-	 *  EMAIL VERIFICATION
-	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
-
-	// Elements
-	const sendVerificationBtn = document.getElementById("send-verification-btn");
-
-	function handleVerifyEmail(actionCode) {
-		// Try to apply the email verification code.
-		applyActionCode(auth, actionCode)
-			.then((resp) => {
-				console.log("Email has been verified.");
-				// Email address has been verified.
-				showActionUI(emailVerifiedUI);
-				// You could also provide the user with a link back to the app.
-				// TODO: If a continue URL is available, display a button which on
-				// click redirects the user back to the app via continueUrl with
-				// additional state determined from that URL's parameters.
-			})
-			.catch((error) => {
-				console.log("Error verifying email" + error.message);
-				showActionUI(emailVerifiedError);
-				sendVerificationBtn.addEventListener("click", sendVerificationEmail, true);
-			});
-	}
-
-	function sendVerificationEmail() {
-		if (auth.currentUser) sendEmailVerification(auth.currentUser);
-		else redirectToLogin();
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
@@ -272,13 +248,10 @@
 	function show(element) {
 		element.style.display = "block";
 	}
-	function isVisible(element) {
-		return element.style.display === "block";
-	}
 	function hide(element) {
 		element.style.display = "none";
 	}
 	function isHidden(element) {
-		return element.style.display === "none" || element.style.display === "";
+		return window.getComputedStyle(element).display === "none";
 	}
 </script>

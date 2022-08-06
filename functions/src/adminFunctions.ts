@@ -7,17 +7,27 @@ const db = admin.firestore();
 import { checkIfAdmin } from "./middleware/authMiddleware";
 import { grantTeacherRole, revokeTeacherRole, getUserData } from "./userFunctions";
 
-/**
- * INCOMPLETE!!
- */
 router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	const userToGrantAdmin = req.body.email;
 	const user = await admin.auth().getUserByEmail(userToGrantAdmin);
 
 	await admin.auth().setCustomUserClaims(user.uid, {
 		admin: true,
+		paid: true,
 	});
+
+	await db.collection("admins").doc(user.uid).set({ email: user.email });
 	res.status(200).send("Granted admin privilege");
+});
+
+router.post("/revokeAdmin", checkIfAdmin, async (req, res) => {
+	const userToGrantAdmin = req.body.email;
+	const user = await admin.auth().getUserByEmail(userToGrantAdmin);
+
+	await admin.auth().setCustomUserClaims(user.uid, {
+		admin: false,
+		paid: false,
+	});
 });
 
 router.post("/provisionUser", checkIfAdmin, async (req, res) => {

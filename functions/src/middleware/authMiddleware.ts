@@ -25,18 +25,19 @@ export const checkIfAuthenticated = (req, res, next) => {
 
 export const checkIfAdmin = (req, res, next) => {
 	getAuthToken(req, res, async () => {
-		try {
-			const { authToken } = req;
-			const userInfo = await admin.auth().verifyIdToken(authToken);
-			const userDoc = await admin.firestore().collection("admins").doc(userInfo.uid).get();
-			if (userDoc.exists) {
-				req["currentUser"] = userInfo.uid; // set the currentUser header on the request to the uid
-				return next();
-			} else throw Error();
-		} catch (error) {
-			return res
-				.status(401)
-				.send({ error: "You are not authorized to make this request. Permission needed: ADMIN" });
-		}
+		const { authToken } = req;
+		await admin
+			.auth()
+			.verifyIdToken(authToken)
+			.then((claims) => {
+				if (claims.admin) {
+					req["currentUser"] = claims.user_id; // set the currentUser header on the request to the uid
+					return next();
+				} else {
+					return res.status(401).send({
+						error: "You are not authorized to make this request. Permission needed: ADMIN",
+					});
+				}
+			});
 	});
 };
