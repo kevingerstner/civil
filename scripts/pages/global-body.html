@@ -1,17 +1,27 @@
 <!-------------------------------------
     Code to be added before </body> tag
 ----------------------------------------->
+<script>
+	function hide(element) {
+		if (element) element.style.display = "none";
+	}
+	function show(element) {
+		if (element) element.style.display = "block";
+	}
+</script>
+
 <script type="module">
 	import {
 		getAuth,
 		onAuthStateChanged,
-		signOut,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
-
-	// Elements
-	const profileElement = document.getElementById("nav-username-dropdown");
-	const loginElement = document.getElementById("login-signup-block");
-	const signoutButton = document.getElementById("signout-btn");
+	import {
+		getFirestore,
+		getDoc,
+		updateDoc,
+		deleteField,
+		doc,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
 
 	const ACCESS_DENIED_URL = "/pay/pricing";
 	// Pages accessible only to paid users
@@ -26,8 +36,12 @@
 		"/units/unit-4-american-political-ideologies-and-beliefs",
 		"/units/unit-5-political-participation",
 	];
+	const unauthenticatedPages = ["/access-denied"];
 
 	const auth = getAuth();
+	const db = getFirestore();
+
+	let metadataRef = null;
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
 			// Send info to GTM
@@ -35,35 +49,33 @@
 			localStorage.setItem("email", user.email);
 			localStorage.setItem("name", user.displayName);
 
+			if (isRouteUnauthenticated()) history.back();
+
+			try {
+				metadataRef = doc(db, `metadata/${user.uid}`);
+				const metadata = await getDoc(metadataRef);
+				if (metadata.exists()) {
+					const refreshTime = metadata.data().refreshTime;
+					if (refreshTime && refreshTime < new Date()) {
+						user.getIdToken(true); // refresh the token
+						await updateDoc(metadataRef, { refreshTime: deleteField() });
+					}
+				}
+			} catch (error) {
+				console.log(error);
+			}
+
 			// Check if user is paid or not
 			user.getIdTokenResult().then((idTokenResult) => {
 				const paid = !!idTokenResult.claims.paid ? true : false;
 				console.log(idTokenResult.claims);
-				if (paid) {
-					hide(document.getElementById("upgrade-btn"));
-					show(document.getElementById("manage-license-btn"));
-					hide(document.getElementById("pricing-nav-item"));
-				} else {
-					show(document.getElementById("upgrade-btn"));
-					hide(document.getElementById("manage-license-btn"));
-				}
 				// Block private content for unpaid users
 				if (isRoutePrivate() && !idTokenResult.claims.admin) {
 					if (!idTokenResult.claims.admin && !paid) window.location.replace(ACCESS_DENIED_URL);
 				}
 			});
-
-			// ---- UI ----
-			if (profileElement) show(profileElement);
-			if (loginElement) hide(loginElement);
-			document.querySelectorAll(".username-text").forEach((element) => {
-				element.innerText = user.displayName;
-			});
 		}
 		if (!user) {
-			if (loginElement) loginElement.style.display = "inline-block";
-			if (profileElement) profileElement.style.display = "none";
-
 			localStorage.removeItem("uid");
 			localStorage.removeItem("email");
 			localStorage.removeItem("name");
@@ -96,27 +108,10 @@
 		return false;
 	}
 
-	function hide(element) {
-		if (element) element.style.display = "none";
+	function isRouteUnauthenticated() {
+		for (var i = 0; i < unauthenticatedPages.length; i++) {
+			if (window.location.pathname.startsWith(unauthenticatedPages[i])) return true;
+		}
+		return false;
 	}
-
-	function show(element) {
-		if (element) element.style.display = "block";
-	}
-
-	/**------------------------------
-	 * Logout
-	 **------------------------------*/
-	signoutButton?.addEventListener("click", (event) => {
-		event.preventDefault();
-		event.stopPropagation();
-
-		signOut(auth)
-			.then(() => {
-				localStorage.removeItem("uid");
-				localStorage.removeItem("articles-viewed");
-				window.location.replace("/");
-			})
-			.catch((error) => console.log(error));
-	});
 </script>

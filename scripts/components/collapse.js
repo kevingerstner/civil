@@ -1,3 +1,28 @@
+document.querySelectorAll(".collapse_shrink").forEach((shrink) => {
+	shrink.style.display = "none";
+});
+document.querySelectorAll(".collapse").forEach((collapse) => {
+	const header = collapse.querySelector(".collapse_header");
+	const content = collapse.querySelector(".collapse_content");
+	header.content = content;
+	content.style.display = "none";
+	header.addEventListener("click", (event) => {
+		let collapse_header = event.currentTarget;
+		const shrink = collapse_header.querySelector(".collapse_shrink");
+		const expand = collapse_header.querySelector(".collapse_expand");
+
+		if (collapse_header.content.style.display === "none") {
+			collapse_header.content.style.display = "block";
+			shrink.style.display = "block";
+			expand.style.display = "none";
+		} else {
+			collapse_header.content.style.display = "none";
+			shrink.style.display = "none";
+			expand.style.display = "block";
+		}
+	});
+});
+
 const collapses = document.querySelectorAll(".collapse");
 for (var i = 0; i < collapses.length; i++) {
 	const shrink = collapses[i].querySelector(".collapse_shrink");
@@ -25,19 +50,5 @@ for (var i = 0; i < collapses.length; i++) {
 		shrink.style.display = "none";
 		expand.style.display = "block";
 		content.style.display = "none";
-	}
-}
-
-function toggleCollapse(event) {
-	let collapse_header = event.currentTarget;
-	let content = collapse_header.content;
-	if (content.style.display === "none") {
-		content.style.display = "block";
-		collapse_header.shrink.style.display = "block";
-		collapse_header.expand.style.display = "none";
-	} else {
-		content.style.display = "none";
-		collapse_header.shrink.style.display = "none";
-		collapse_header.expand.style.display = "block";
 	}
 }

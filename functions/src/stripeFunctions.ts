@@ -1,22 +1,22 @@
 import * as express from "express";
 const router = express.Router();
 import { https } from "firebase-functions";
-import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {
+	slackSubscribeNotification,
+	slackSubscriptionCancelledNotification,
+} from "./slackFunctions";
+import { FieldValue } from "firebase-admin/firestore";
 const db = admin.firestore();
 import { checkIfAuthenticated } from "./middleware/authMiddleware";
-import { grantTeacherRole } from "./userFunctions";
+import { grantClaim, revokeClaim, notifyClientToRefreshToken, getUserData } from "./userFunctions";
 
 import Stripe from "stripe";
-import { Timestamp } from "firebase-admin/firestore";
-const stripe = new Stripe(functions.config().stripe.key, {
+const stripe = new Stripe(process.env.STRIPE_KEY!, {
 	apiVersion: "2020-08-27",
 });
 
-const DOMAIN = "https://www.civilmedia.io";
-
-const TEST_MODE = false;
-const TEST_MODE_KEY = "";
+const DOMAIN = "https://civilmedia.io";
 
 /**
  * The Stripe webhook that handles response to checkout events
@@ -30,108 +30,206 @@ router.post("/webhook", async (request, response) => {
 		event = stripe.webhooks.constructEvent(
 			firebaseRequest.rawBody,
 			signature!,
-			TEST_MODE ? TEST_MODE_KEY : functions.config().stripe.webhook_secret
+			process.env.STRIPE_WEBHOOK_SECRET!
 		);
 	} catch (err: any) {
-		console.log("Webhook signature verification failed.", err.message);
-		return response.sendStatus(400);
+		console.log("WEBHOOK SIG VERIFICATION FAILED");
+		return response.status(400).send(`Webhook signature verification failed: ${err.message}`);
 	}
 	// Handle the event
-	console.log("event called: ", event.type);
+	console.log("[STRIPE WEBHOOK]: ", event.type);
 	switch (event.type) {
 		case "checkout.session.completed": {
-			await addCustomer(event);
-			await giveUserAccess(event);
+			await handleCheckoutComplete(event);
+			break;
+		}
+		case "customer.created": {
+			await handleCustomerCreated(event);
+			break;
+		}
+		case "customer.deleted": {
+			await handleCustomerDeleted(event);
 			break;
 		}
 		case "customer.subscription.created": {
-			await addCustomer(event);
+			await handleSubscriptionCreated(event);
 			break;
 		}
-		case "invoice.paid": {
-			await giveUserAccess(event);
+		case "customer.subscription.updated": {
+			await handleSubscriptionUpdated(event);
 			break;
 		}
 		case "customer.subscription.deleted": {
-			await revokeUserAccess(event);
+			await handleSubscriptionDeleted(event);
 			break;
 		}
 	}
 	return response.status(200).send();
 });
 
-/**
- * Adds a new document to the "Customer" collection
- * @param {any} event the webhook event object
- */
-async function addCustomer(event: any) {
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * WEBHOOK EVENT HANDLERS
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+
+/* ------------- CHECKOUT ------------------ */
+async function handleCheckoutComplete(event) {
 	const eventData = event.data.object;
-	let expires;
-	// If this checkout was a subscription, set an expiration date
-	// THIS IS IN PROGRESS
-	if (eventData.mode === "subscription") {
-		expires = await getSubscriptionExpirationDate(eventData.subscription);
-	}
+	const uid = eventData.client_reference_id;
+	const customer = eventData.customer;
 
-	// Get the UID
-	let userID;
-	if (eventData.client_reference_id) userID = eventData.client_reference_id;
-	else {
-		getUserIDByCustomerID(eventData.customer);
-	}
-
-	const customerRef = await db.collection("customers").doc(eventData.customer).get();
-	if (!customerRef.exists) {
-		await db.collection("customers").doc(eventData.customer).set({
-			userID,
-			access: true,
-			expires,
+	if (uid) {
+		await stripe.customers.update(customer, {
+			metadata: { uid },
 		});
+		// Create a customer document in the database
+		await db.collection("customers").doc(customer).set({ uid, active: true }, { merge: true });
+		notifyClientToRefreshToken(uid); // make the client refresh their token
+		console.log("created a new customer: " + customer + " with uid: " + uid);
+	} else {
+		console.error("Error completing checkout: UID was not received.");
 	}
 }
 
-/**
- * Creates a license in the database for the user
- * @param {Stripe.Event} event The stripe event from the webhook
- */
-async function giveUserAccess(event: any) {
-	const eventData = event.data.object;
-	// Get the customer in Firebase, which stores the relationship between the customer id and user id
-	const uid = await getUserIDByCustomerID(eventData.customer);
-	if (uid) await grantTeacherRole(uid);
+/* ------------- CUSTOMERS ------------------ */
 
-	console.log("created license and marked paid for " + uid);
+async function handleCustomerCreated(event) {
+	const eventData = event.data.object;
+	await db.collection("customers").doc(eventData.id).set(
+		{
+			active: true,
+			email: eventData.email,
+		},
+		{ merge: true }
+	);
 }
 
-async function revokeUserAccess(event: any) {
+async function handleCustomerDeleted(event) {
+	await db.collection("customers").doc(event.data.object.id).delete();
+}
+
+/* ------------- SUBSCRIPTION ----------------- */
+
+async function handleSubscriptionCreated(event) {
 	const eventData = event.data.object;
-	const customer = await db.collection("customers").doc(eventData.customer).get();
-	if (customer.exists) {
-		const data = customer.data();
-		if (data) {
-			data.access = false;
-			data.expires = null;
+	if (!eventData.customer) {
+		console.error("(SUBSCRIPTION): The event customer.subscription.created requires a customer ID");
+	}
+
+	await db
+		.collection("customers")
+		.doc(eventData.customer)
+		.update({ active: true, subscription: eventData.id, joinDate: FieldValue.serverTimestamp() });
+
+	const uid = await getUserIDByCustomerID(eventData.customer);
+	// Grant the paid claim for this user
+	if (uid) {
+		await grantClaim(uid, "paid");
+		console.log("(SUBSCRIPTION): Created license and marked paid for " + uid);
+		// Post the notification to Slack
+		const userData = await getUserData(uid);
+		if (userData) {
+			const { email, firstName, lastName, schoolName, location } = userData;
+			slackSubscribeNotification(email, firstName, lastName, schoolName, location);
+		}
+	} else {
+		console.error(
+			"(SUBSCRIPTION): Could not retrieve the UID from this Customer ID: " + eventData.customer
+		);
+	}
+}
+
+async function handleSubscriptionUpdated(event) {
+	const eventData = event.data.object;
+	console.log(eventData);
+	// If the user canceled their subscription at the end of the current period, send a notification
+	if (eventData.cancel_at_period_end) {
+		const uid = await getUserIDByCustomerID(eventData.customer);
+		console.log("UID: " + uid);
+		if (uid) {
+			const userData = await getUserData(uid);
+			await slackSubscriptionCancelledNotification(
+				userData.email,
+				userData.firstName,
+				userData.lastName,
+				new Date(eventData.current_period_end * 1000).toLocaleString("en-US", {
+					timeZoneName: "short",
+				})
+			);
 		}
 	}
-	console.log("revoked license for " + eventData.email);
 }
 
+async function handleSubscriptionDeleted(event) {
+	const eventData = event.data.object;
+	// Revoke the paid claim from this user
+	const uid = await getUserIDByCustomerID(eventData.customer);
+
+	if (uid) {
+		await revokeClaim(uid, "paid"); // revoke the paid claim
+		notifyClientToRefreshToken(uid); // set the user's token expiration to now so it refreshes
+	} else {
+		console.error("[ERROR] Unable to find uid associated with " + eventData.customer);
+	}
+	// Update the customer document with no access and clear the expiration date
+	await db
+		.collection("customers")
+		.doc(eventData.customer)
+		.update({ active: false, subscription: null });
+	console.log("revoked license for " + eventData.customer);
+}
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * API ENDPOINTS
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+
 router.post("/checkout", async (request, response) => {
-	const payload = request.body;
-	console.log(payload);
+	console.log("CHECKOUT API");
 	try {
+		if (!request.body.uid) throw new Error("Invalid request. UID not included in the request body");
+		if (!request.body.email) {
+			throw new Error("Invalid request. Email not included in the request body");
+		}
 		const session = await stripe.checkout.sessions.create({
-			client_reference_id: payload.uid,
-			customer_email: payload.email,
-			line_items: payload.line_items, // in the form of [{price: '', quantity: ''}]
+			client_reference_id: request.body.uid,
+			customer_email: request.body.email,
+			line_items: request.body.line_items, // in the form of [{price: '', quantity: ''}]
 			mode: "subscription",
 			success_url: `${DOMAIN}/pay/success`,
 			cancel_url: `${DOMAIN}/pay/cancel`,
+			subscription_data: {
+				trial_period_days: 14,
+			},
 		});
 		response.status(200).json({ url: session.url });
 	} catch (err: any) {
-		response.status(400).send("An error occurred, Kevin. It's this: " + err.message);
+		response
+			.status(400)
+			.send("An error occurred while creating the Checkout Session: " + err.message);
 	}
+});
+
+// I think this is currently unused since subscription management is done through the Stripe Customer Portal
+router.post("/cancel-subscription", checkIfAuthenticated, async (req, res) => {
+	const uid = req["currentUser"];
+	console.log("UID: " + uid);
+	const customerID = await getCustomerIDbyUserID(uid);
+	console.log("CID: " + customerID);
+
+	if (customerID) {
+		const subscription = await stripe.subscriptions.list({
+			customer: customerID,
+			limit: 1,
+		});
+		stripe.subscriptions.update(subscription.data[0].id, {
+			trial_end: "now",
+		});
+		res.status(200).send("Subscription successfully canceled for " + req.body.email);
+	}
+	res
+		.status(400)
+		.send(
+			"Unable to cancel subscription. Please contact team@civilmedia.io if you continue encountering this issue."
+		);
 });
 
 /**
@@ -139,46 +237,24 @@ router.post("/checkout", async (request, response) => {
  */
 router.post("/create-customer-portal-session", checkIfAuthenticated, async (req, res) => {
 	const uid = req["currentUser"];
-	console.log("UID: ", uid);
-	const returnUrl = "https://www.civilmedia.io";
 	const customerID = await getCustomerIDbyUserID(uid);
-	console.log("CUSTOMER ID: " + customerID);
 	if (customerID) {
 		try {
 			const portalSession = await stripe.billingPortal.sessions.create({
 				customer: customerID,
-				return_url: returnUrl,
+				return_url: DOMAIN,
 			});
 			res.status(200).json({ url: portalSession.url });
 		} catch (error) {
 			console.log(error);
-			res.status(400).send();
+			res.status(400).send(error);
 		}
 	}
 });
 
-/**
- * Gets the expiration date for access for this subscription.
- * If the subscription is yearly, this will return a Timestamp for a year from now.
- * If the subscription is monthly, this will return a Timestamp for a month from now.
- * @param {string} subscriptionID the id for the subscription
- * @return {Timestamp | null} a Firestore Timestamp for either a year from now or a month, depending on the subscription recur duration
- */
-async function getSubscriptionExpirationDate(subscriptionID) {
-	const subscription = await stripe.subscriptions.retrieve(subscriptionID);
-	const interval = subscription.items.data[0].price.recurring?.interval;
-	if (interval === "year") {
-		const date = new Date(new Date().setFullYear(new Date().getFullYear() + 1));
-		console.log("year from now " + date);
-		return Timestamp.fromDate(date);
-	}
-	if (interval === "month") {
-		const date = new Date(new Date().setMonth(new Date().getMonth() + 1));
-		console.log("month from now: " + date);
-		return Timestamp.fromDate(date);
-	}
-	return null;
-}
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * HELPER FUNCTIONS
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
 
 /**
  * Gets the customerID from the license from the uid
@@ -186,14 +262,9 @@ async function getSubscriptionExpirationDate(subscriptionID) {
  * @return {Promise <string | null>} a customerid or null
  */
 async function getCustomerIDbyUserID(uid: string): Promise<string | null> {
-	const license = await db.collection("licenses").where("userID", "==", uid).limit(1).get();
-	if (license.empty) {
-		console.log("no customer was found with that id.");
-		return null;
-	} else {
-		console.log("found license");
-		return license.docs[0].id;
-	}
+	const customer = await db.collection("customers").where("uid", "==", uid).limit(1).get();
+	if (customer.empty) return null;
+	else return customer.docs[0].id;
 }
 
 /**
@@ -204,7 +275,7 @@ async function getCustomerIDbyUserID(uid: string): Promise<string | null> {
 async function getUserIDByCustomerID(customerID): Promise<string | null> {
 	if (!customerID) return null;
 	const customer = await db.collection("customers").doc(customerID).get();
-	if (!customer.exists) {
+	if (customer.exists) {
 		const data = customer.data();
 		if (data) return data.uid;
 	}

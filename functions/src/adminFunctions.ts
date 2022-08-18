@@ -5,7 +5,7 @@ const router = express.Router();
 const db = admin.firestore();
 
 import { checkIfAdmin } from "./middleware/authMiddleware";
-import { grantTeacherRole, revokeTeacherRole, getUserData } from "./userFunctions";
+import { grantClaim, revokeClaim, getUserData } from "./userFunctions";
 
 router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	const userToGrantAdmin = req.body.email;
@@ -36,7 +36,7 @@ router.post("/provisionUser", checkIfAdmin, async (req, res) => {
 	if (!user) {
 		return res.status(404).send("Could not find user with email " + userToProvision);
 	}
-	await grantTeacherRole(user.uid);
+	await grantClaim(user.uid, "paid");
 	return res.status(200).send("Provisioned " + userToProvision);
 });
 
@@ -46,7 +46,7 @@ router.post("/unprovisionUser", checkIfAdmin, async (req, res) => {
 	if (!user) {
 		return res.status(404).send("Could not find user with email " + userToUnprovision);
 	}
-	await revokeTeacherRole(user.uid);
+	await revokeClaim(user.uid, "paid");
 	return res.status(200).send("Unprovisioned " + userToUnprovision);
 });
 

@@ -4,6 +4,8 @@
 		onAuthStateChanged,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
+	const SIGNUP_URL = "/welcome/signup";
+
 	const SLIDES_EMBED = document.querySelector("#slides-embed");
 	const SLIDES_BTN = document.querySelector("#slides-btn");
 	const QUESTIONS_CONTENT = document.querySelector("#questions-content");
@@ -14,6 +16,18 @@
 	SLIDES_DENIED.style.display = "none";
 	QUESTIONS_DENIED.style.display = "none";
 
+	// Paywall
+	const ARTICLE_SIGNUP_BTN = document.querySelector("#article-signup-btn");
+	const PAYWALL_EL = document.querySelector(".paywall");
+	const PAYWALL_NOTICE = document.querySelector(".paywall-notice");
+	PAYWALL_EL.style.display = "none";
+
+	let articleCookie = localStorage.getItem("articles-viewed");
+	articleCookie = articleCookie ? articleCookie.split(",") : [];
+
+	const MAX_ARTICLES = 3;
+	const articlesLeftEl = document.getElementById("articles-left");
+
 	const auth = getAuth();
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
@@ -22,8 +36,9 @@
 					hidePaidContent();
 				}
 			});
+			disablePaywall();
 		} else {
-			hidePaidContent();
+			enablePaywall();
 		}
 	});
 
@@ -33,5 +48,110 @@
 		QUESTIONS_CONTENT.remove();
 		SLIDES_DENIED.style.display = "block";
 		QUESTIONS_DENIED.style.display = "block";
+	}
+
+	function enablePaywall() {
+		// SET THE LINK OF THE PAYWALL BTN WITH CONTINUEURL
+		let articleSignupBtnLink = new URL(window.location.origin + SIGNUP_URL);
+		articleSignupBtnLink.searchParams.set("continueURL", window.location.pathname);
+		ARTICLE_SIGNUP_BTN.href = articleSignupBtnLink;
+		// HANDLE THE PAYWALL
+		if (articleCookie) {
+			console.log("user has viewed " + articleCookie.length + " articles.");
+			if (articleCookie.length >= 3 && !articleCookie.includes(window.location.href)) {
+				PAYWALL_EL.style.display = "block";
+				document.body.style.overflow = "hidden";
+				hidePaidContent();
+			}
+			// HANDLE UI
+			if (articlesLeftEl) {
+				let articlesLeft = MAX_ARTICLES - articleCookie.length;
+				articlesLeftEl.innerHTML = `You have <span style="font-weight: bold">${articlesLeft}</span> member-only ${
+					articlesLeft == 1 ? "story" : "stories"
+				} left.`;
+			}
+		}
+	}
+
+	function disablePaywall() {
+		PAYWALL_NOTICE.style.display = "none";
+		PAYWALL_EL.style.display = "none";
+		document.body.style.overflow = "auto";
+	}
+
+	$(window).scroll(function () {
+		if ($(window).scrollTop() + $(window).height() > $("#main-content").height() - 400) {
+			if (!articleCookie.includes(window.location.href) && !{{wf {&quot;path&quot;:&quot;editiorial&quot;,&quot;type&quot;:&quot;Bool&quot;\} }})
+				articleCookie.push(window.location.href);
+			localStorage.setItem("articles-viewed", articleCookie.toString());
+		}
+	});
+</script>
+
+<!-- COLLAPSE -->
+<script>
+	document.querySelectorAll(".collapse_shrink").forEach((shrink) => {
+		shrink.style.display = "none";
+	});
+	document.querySelectorAll(".collapse").forEach((collapse) => {
+		const header = collapse.querySelector(".collapse_header");
+		const content = collapse.querySelector(".collapse_content");
+		header.content = content;
+		content.style.display = "none";
+		header.addEventListener("click", (event) => {
+			let collapse_header = event.currentTarget;
+			const shrink = collapse_header.querySelector(".collapse_shrink");
+			const expand = collapse_header.querySelector(".collapse_expand");
+
+			if (collapse_header.content.style.display === "none") {
+				collapse_header.content.style.display = "block";
+				shrink.style.display = "block";
+				expand.style.display = "none";
+			} else {
+				collapse_header.content.style.display = "none";
+				shrink.style.display = "none";
+				expand.style.display = "block";
+			}
+		});
+	});
+</script>
+
+<script type="module">
+	import {
+		getFunctions,
+		httpsCallable,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-functions.js";
+	const functions = getFunctions();
+	const subscribeToNewsletter = httpsCallable(functions, "mailchimp-subscribeToNewsletter");
+
+	// Elements
+	const signupLocation = "Article: " + document.title;
+	const newsletterForm = document.getElementById("newsletter-form");
+	const newsletterSuccess = document.getElementById("newsletter-form-success");
+	const newsletterError = document.getElementById("newsletter-form-error");
+	const errorMessage = document.getElementById("newsletter-form-error-message");
+
+	const newsletterSubmit = document.getElementById("newsletter-submit");
+	newsletterSubmit.addEventListener("click", subscribe);
+
+	function subscribe(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const email = document.getElementById("newsletter-email").value;
+		subscribeToNewsletter({ email: email, location: signupLocation })
+			.then((response) => {
+				// Hide the Form and Errors, and show the success message
+				newsletterSuccess.style.display = "block";
+				newsletterForm.style.display = "none";
+				newsletterError.style.display = "none";
+				dataLayer.push({ event: "newsletter_subscribe", email: email });
+			})
+			.catch((error) => {
+				// Show the error message
+				console.log(error);
+				errorMessage.innerHTML = error.message;
+				newsletterForm.style.display = "block";
+				newsletterError.style.display = "block";
+			});
 	}
 </script>

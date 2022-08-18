@@ -5,16 +5,21 @@
 		onAuthStateChanged,
 		signOut,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
-	const auth = getAuth();
-	const apiUrl = "https://us-central1-civil-ed.cloudfunctions.net/api";
 
+	// URL
+	const API_URL = "https://us-central1-civil-ed.cloudfunctions.net/api";
+	const LOGIN_URL = "/welcome/login";
+	const CURRENT_PAGE_URL = "/pay/pricing";
+
+	// ELEMENTS
 	const monthlyText = document.getElementById("teacher-monthly");
 	const yearlyText = document.getElementById("teacher-yearly");
 	const priceUnitLabel = document.getElementById("teacher-price-unit-label");
 	const createAccountBtn = document.getElementById("create-account-btn");
+	const teacherBtn = document.querySelector("#teacher-purchase-btn");
+	const bundleBtn = document.querySelector("#bundle-purchase-btn");
 
-	document.querySelector("#teacher-price-switch").addEventListener("click", toggleTeacherPrice);
-
+	// VAR
 	let teacherMonthly = false;
 	let checkoutData = {
 		uid: localStorage.getItem("uid"),
@@ -27,19 +32,29 @@
 		],
 	};
 
+	// UI
+	teacherBtn.classList.remove("disabled");
+	teacherBtn.innerHTML = "Start 14-Day Free Trial";
+	bundleBtn.classList.remove("disabled");
+
+	const auth = getAuth();
 	onAuthStateChanged(auth, (user) => {
 		if (user) {
 			if (createAccountBtn) createAccountBtn.style.display = "none";
 		}
 	});
 
-	document.querySelector("#bundle-purchase-btn").addEventListener("click", () => {
+	bundleBtn.addEventListener("click", () => {
+		event.target.classList.add("disabled");
+		event.target.innerHTML = "Loading...";
 		const bundle_price = event.target.getAttribute("data-price");
 		checkoutData.line_items[0].price = bundle_price;
 		purchase();
 	});
 
-	document.querySelector("#teacher-purchase-btn").addEventListener("click", () => {
+	teacherBtn.addEventListener("click", () => {
+		event.target.innerHTML = "Loading...";
+		event.target.classList.add("disabled");
 		const monthly_price = event.target.getAttribute("data-price-monthly");
 		const yearly_price = event.target.getAttribute("data-price-annual");
 
@@ -47,7 +62,8 @@
 		purchase();
 	});
 
-	function toggleTeacherPrice(event) {
+	// TOGGLE MONTHLY / ANNUAL
+	document.querySelector("#teacher-price-switch").addEventListener("click", (event) => {
 		// Change to Yearly
 		if (monthlyText.classList.contains("active")) {
 			teacherMonthly = false;
@@ -60,20 +76,24 @@
 			monthlyText.classList.add("active");
 			yearlyText.classList.remove("active");
 		}
-	}
+	});
 
 	async function purchase() {
 		if (auth.currentUser && localStorage.getItem("uid")) {
 			axios({
 				method: "post",
-				url: `${apiUrl}/stripe/checkout`,
+				url: `${API_URL}/stripe/checkout`,
 				data: checkoutData,
-			}).then((response) => {
-				if (response.data.url) window.location.href = response.data.url;
-			});
+			})
+				.then((response) => {
+					if (response.data.url) window.location.href = response.data.url;
+				})
+				.catch((error) => {
+					console.log(error);
+				});
 		} else {
-			let url = new URL("/login", window.location.origin);
-			url.searchParams.append("continueURL", "/pay/pricing");
+			let url = new URL(LOGIN_URL, window.location.origin);
+			url.searchParams.append("continueURL", CURRENT_PAGE_URL);
 			window.location.href = url;
 		}
 	}

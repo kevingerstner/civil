@@ -4,32 +4,25 @@
 		getAuth,
 		signInWithEmailAndPassword,
 		getAdditionalUserInfo,
-		onAuthStateChanged,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
-	const loginErrorCodes = {
-		InvalidEmail: "auth/invalid-email",
-		UserDisabled: "auth/user-disabled",
-		UserNotFound: "auth/user-not-found",
-		WrongPassword: "auth/wrong-password",
-	};
-
+	// AUTH
 	const auth = getAuth();
 
-	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
-	 *  LOGIN
-	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
-	let loginForm = document.getElementById("login-form");
-	loginForm.addEventListener("submit", login, true);
+	// URL
+	const SUCCESS_URL = "/welcome/success";
 
+	// ELEMENTS
+	document.getElementById("login-form").addEventListener("submit", login);
 	const loginButton = document.getElementById("login-btn");
-
 	let loginEmail = document.getElementById("login-email");
 	let loginPassword = document.getElementById("login-password");
-
 	let loginErrorMessage = document.getElementById("login-error-message");
+
+	// UI
 	loginErrorMessage.style.display = "none";
 
+	// FUNCTIONS
 	async function login(event) {
 		event.preventDefault();
 		event.stopPropagation();
@@ -51,34 +44,31 @@
 				if (continueURL) {
 					window.location.replace(new URL(continueURL, window.location.origin));
 				} else {
-					window.location.replace("/login-success");
+					window.location.replace(SUCCESS_URL);
 				}
 			})
 			.catch((error) => {
 				console.log(error);
-				let errorMessage = "";
-
+				console.log(error.message);
 				switch (error.code) {
-					case loginErrorCodes.InvalidEmail:
-						errorMessage = `${email} is invalid. Please try again.`;
+					case "auth/invalid-email":
+						loginErrorMessage.innerText = `${email} is invalid. Please try again.`;
 						break;
-					case loginErrorCodes.UserDisabled:
-						errorMessage = `${email} has been disabled. Please reach out to us if you believe this is in error.`;
+					case "auth/user-disabled":
+						loginErrorMessage.innerText = `${email} has been disabled. Please reach out to us if you believe this is in error.`;
 						break;
-					case loginErrorCodes.UserNotFound:
-						errorMessage = `No account exists for ${email}. Please reach out to us if you believe this is in error.`;
+					case "auth/user-not-found":
+						loginErrorMessage.innerText = `No account exists for ${email}. Please reach out to us if you believe this is in error.`;
 						break;
-					case loginErrorCodes.WrongPassword:
-						errorMessage = "Your password is incorrect. Please try again.";
+					case "auth/wrong-password":
+						loginErrorMessage.innerText = "Your password is incorrect. Please try again.";
 						break;
 					default:
-						errorMessage = "An unknown error occurred! Please try again.";
+						loginErrorMessage.innerText = "An unknown error occurred! Please try again.";
 				}
 
 				// Reset UI
-				loginErrorMessage.innerText = errorMessage;
 				loginErrorMessage.style.display = "block";
-
 				loginButton.disabled = false;
 				loginButton.classList.remove("btn-disabled");
 				loginButton.innerText = "Login";

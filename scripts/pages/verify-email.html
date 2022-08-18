@@ -14,13 +14,15 @@
 	const emailVerifiedBoxSuccess = document.getElementById("email-verify");
 	emailVerifiedBoxSuccess.style.display = "none";
 
+	const LOGIN_URL = "/welcome/login";
+
 	// Show Loader
 	const loader = document.getElementById("loader");
 	loader.style.display = "block";
 
 	const auth = getAuth();
 	onAuthStateChanged(auth, (user) => {
-		if (!user) window.location.replace("/login");
+		if (!user) window.location.replace(LOGIN_URL);
 		if (user.emailVerified) window.location.replace("/");
 
 		// Set email text to the user's email

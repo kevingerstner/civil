@@ -32,5 +32,6 @@ module.exports = {
 		"@typescript-eslint/no-var-requires": 0,
 		"require-jsdoc": 0,
 		"new-cap": ["error", { capIsNewExceptions: ["Router"] }],
+		"operator-linebreak": "off", // fix this eventually, prettier conflict with eslint
 	},
 };

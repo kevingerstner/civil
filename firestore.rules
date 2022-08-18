@@ -5,6 +5,10 @@ service cloud.firestore {
     	allow create: if request.auth != null;
     	allow read, update, delete: if request.auth != null && request.auth.uid == userID;
     }
+    match /metadata/{userID} {
+    	allow read, update, delete: if request.auth != null && request.auth.uid == userID;
+      allow create: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }

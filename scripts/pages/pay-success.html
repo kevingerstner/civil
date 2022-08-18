@@ -1,0 +1,17 @@
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+		connectAuthEmulator,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+	const auth = getAuth();
+	connectAuthEmulator(auth, "http://localhost:9099");
+
+	// Manually refresh token (after receiving paid claim)
+	onAuthStateChanged(auth, (user) => {
+		if (user) {
+			user.getIdToken(true);
+		}
+	});
+</script>

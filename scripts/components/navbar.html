@@ -1,13 +1,68 @@
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script type="module">
-	import { getAuth } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+	import {
+		getAuth,
+		onAuthStateChanged,
+		signOut,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
 	const auth = getAuth();
+
 	const stripePortalURL = "https://us-central1-civil-ed.cloudfunctions.net/api";
 
-	document.querySelector("#manage-license-btn").addEventListener("click", async () => {
-		const user = auth.currentUser;
-		let token = user && (await user.getIdToken(true));
+	const registeredUI = document.querySelector("#registered-ui");
+	const unregisteredUI = document.querySelector("#unregistered-ui");
+
+	const pricingTab = document.querySelector("#pricing-nav-item");
+
+	const signoutButton = document.getElementById("signout-btn");
+	const upgradeButton = document.querySelector("#upgrade-btn");
+	const manageSubscriptionButton = document.querySelector("#manage-license-btn");
+
+	onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			show(registeredUI);
+			hide(unregisteredUI);
+			const displayName = user.displayName;
+			document.querySelectorAll(".username-text").forEach((element) => {
+				if (displayName !== "null") element.innerText = displayName;
+				else element.innerText = "Account";
+			});
+			user.getIdTokenResult().then((idTokenResult) => {
+				const paid = !!idTokenResult.claims.paid ? true : false;
+				// Update if the user is paid
+				if (paid) {
+					show(manageSubscriptionButton);
+					hide(upgradeButton);
+					hide(pricingTab);
+				} else {
+					show(upgradeButton);
+					hide(manageSubscriptionButton);
+				}
+			});
+		} else {
+			show(unregisteredUI);
+			hide(registeredUI);
+		}
+	});
+
+	signoutButton.addEventListener("click", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		signOut(auth)
+			.then(() => {
+				localStorage.removeItem("uid");
+				location.reload();
+			})
+			.catch((error) => console.log(error));
+	});
+
+	manageSubscriptionButton.addEventListener("click", async (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		let token = auth.currentUser && (await auth.currentUser.getIdToken(true));
 		axios({
 			method: "post",
 			url: stripePortalURL + "/stripe/create-customer-portal-session",

@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { slackNewUserNotification, slackSignupNotification } from "./slackFunctions";
 
 import express from "express";
 const router = express.Router();
@@ -8,41 +9,31 @@ const db = admin.firestore();
 import { checkIfAuthenticated } from "./middleware/authMiddleware";
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
- *  READ
+ *  CREATE
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+exports.sendUserDataToSlack = functions.firestore
+	.document("users/{userId}")
+	.onCreate(async (snapshot, context) => {
+		const { email, firstName, lastName, jobTitle, schoolName, location, referral } =
+			snapshot.data();
+		slackSignupNotification(email, firstName, lastName, jobTitle, schoolName, location, referral);
+	});
+
+exports.handleNewUser = functions.auth.user().onCreate(async (user) => {
+	functions.logger.warn("Posting Signup to Slack");
+	slackNewUserNotification(user.email, user.uid);
+});
+
+/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+ *  PROFILE
+ * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
 router.get("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	const uid = req.params.uid;
 	const profileData = await getUserData(uid);
 	functions.logger.log(profileData);
 	res.status(200).json(profileData);
-});
-
-/**
- * Checks if this user has a Civil License
- */
-router.get("/authorizing", checkIfAuthenticated, async (req, res) => {
-	const license = await db
-		.collection("licenses")
-		.where("userID", "==", req["currentUser"])
-		.limit(1)
-		.get();
-	if (license.empty) {
-		return res.status(401).send("Access denied");
-	} else {
-		return res.status(200).send("Authorized");
-	}
-});
-
-/**
- * Returns the value of the "provisioned" field in the user's document, or false if not found.
- */
-exports.isProvisioned = functions.https.onCall(async (data, context) => {
-	if (!context.auth) return;
-	const userData = await getUserData(context.auth.uid);
-	if (userData && userData.provisioned) {
-		return { provisioned: userData.provisioned };
-	}
-	return { provisioned: false };
 });
 
 /**
@@ -59,9 +50,6 @@ export async function getUserData(uid: string): Promise<any> {
 	return null;
 }
 
-/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
- *  UPDATE
- * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	const uid = req.params.uid;
 
@@ -87,28 +75,44 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  CLAIMS
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
-export async function grantTeacherRole(uid: string) {
-	console.log("UID", uid);
-	// set the claim for the user
-	const user = await admin.auth().getUser(uid);
-	let claims = user.customClaims;
-	if (claims) {
-		claims.teacher = true;
-		claims.paid = true;
-	} else {
-		claims = { teacher: true, paid: true };
-	}
 
-	await admin.auth().setCustomUserClaims(user.uid, claims);
+export async function grantClaim(uid: string, claimName: string) {
+	await admin
+		.auth()
+		.getUser(uid)
+		.then(async (user) => {
+			let claims = user.customClaims;
+			if (!claims) claims = {};
+			claims[claimName] = true;
+			await admin.auth().setCustomUserClaims(user.uid, claims);
+		})
+		.catch(() => {
+			throw Error("Unable to grant " + claimName + " claim for user " + uid);
+		});
 }
 
-export async function revokeTeacherRole(uid: string) {
-	// revoke teacher and paid claims
-	const user = await admin.auth().getUser(uid);
-	await admin.auth().setCustomUserClaims(user.uid, {
-		teacher: null,
-		paid: null,
-	});
+export async function revokeClaim(uid: string, claimName: string) {
+	await admin
+		.auth()
+		.getUser(uid)
+		.then(async (user) => {
+			let claims = user.customClaims;
+			if (claims) claims[claimName] = null;
+			else claims = { claimName: null };
+			await admin.auth().setCustomUserClaims(user.uid, claims);
+		})
+		.catch(() => {
+			throw Error("Unable to grant " + claimName + " claim for user " + uid);
+		});
+}
+
+/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+ *  METADATA
+ * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+// set the user's token expiration to now so it refreshes
+export async function notifyClientToRefreshToken(uid) {
+	await db.collection("metadata").doc(uid).set({ refreshTime: new Date().getTime() });
 }
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=

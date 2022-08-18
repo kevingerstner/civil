@@ -3,6 +3,7 @@
 		getAuth,
 		createUserWithEmailAndPassword,
 		updateProfile,
+		onAuthStateChanged,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 	import {
 		getFirestore,
@@ -10,11 +11,13 @@
 		doc,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
 
-	const db = getFirestore();
+	// AUTH
 	const auth = getAuth();
+	const db = getFirestore();
 
-	// The URL of the login page
-	const LOGIN_URL = window.location.origin + "/login";
+	// URL
+	const LOGIN_URL = "/welcome/login";
+	const VERIFY_URL = "/welcome/verify";
 
 	// Initialize Signup Form Submit Listener
 	const SIGNUP_FORM_EL = document.getElementById("signup-form");
@@ -77,7 +80,7 @@
 					console.log(`Error Updating this users' profile: ${err}`);
 				});
 
-				const url = new URL(window.location.origin + "/signup/verify-email");
+				const url = new URL(window.location.origin + VERIFY_URL);
 				url.searchParams.set("continueURL", continueURL);
 				window.location.href = url;
 			})
@@ -85,7 +88,9 @@
 				let errorMessage = "";
 				switch (error.code) {
 					case "auth/email-already-in-use":
-						errorMessage = `${formData.email} is already associated with an account. <a href=${LOGIN_URL}>Login?</a>`;
+						errorMessage = `${formData.email} is already associated with an account. <a href=${
+							window.location.origin + LOGIN_URL
+						}>Login?</a>`;
 						break;
 					default:
 						errorMessage = `An error occurred creating an account for ${formData.email}: ${error.message}`;

@@ -5,15 +5,11 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 const db = admin.firestore();
 
-const mailchimpConfig = functions.config().mailchimp;
-// const mcApiKeyTx = mailchimpConfig.api_key_tx;
-// const mailchimpTx = require("@mailchimp/mailchimp_transactional")(mcApiKeyTx);
-
 const md5 = require("md5");
-const mcApiKey = mailchimpConfig.api_key;
+const mcApiKey = process.env.MAILCHIMP_API_KEY;
 const Mailchimp = require("mailchimp-api-v3");
 const mailchimp = new Mailchimp(mcApiKey);
-const listId = mailchimpConfig.audienceid;
+const listId = process.env.MAILCHIMP_AUDIENCEID;
 
 /* +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=
  * SUBSCRIBE
