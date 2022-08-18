@@ -5,6 +5,7 @@ import * as admin from "firebase-admin";
 import {
 	slackSubscribeNotification,
 	slackSubscriptionCancelledNotification,
+	slackSubscriptionRenewedNotification,
 } from "./slackFunctions";
 import { FieldValue } from "firebase-admin/firestore";
 const db = admin.firestore();
@@ -16,7 +17,7 @@ const stripe = new Stripe(process.env.STRIPE_KEY!, {
 	apiVersion: "2020-08-27",
 });
 
-const DOMAIN = "https://civilmedia.io";
+const DOMAIN = "https://civilmedia.webflow.io";
 
 /**
  * The Stripe webhook that handles response to checkout events
@@ -141,12 +142,16 @@ async function handleSubscriptionCreated(event) {
 async function handleSubscriptionUpdated(event) {
 	const eventData = event.data.object;
 	console.log(eventData);
+	const customerData = await getCustomerData(eventData.customer);
+	const uid = await getUserIDByCustomerID(eventData.customer);
+	if (!uid) {
+		return console.error("Unable to get User ID for customer " + eventData.customer);
+	}
+	const userData = await getUserData(uid);
 	// If the user canceled their subscription at the end of the current period, send a notification
 	if (eventData.cancel_at_period_end) {
-		const uid = await getUserIDByCustomerID(eventData.customer);
-		console.log("UID: " + uid);
+		updateCustomer(eventData.customer, { active: false }); // set the customer's active to false
 		if (uid) {
-			const userData = await getUserData(uid);
 			await slackSubscriptionCancelledNotification(
 				userData.email,
 				userData.firstName,
@@ -154,6 +159,17 @@ async function handleSubscriptionUpdated(event) {
 				new Date(eventData.current_period_end * 1000).toLocaleString("en-US", {
 					timeZoneName: "short",
 				})
+			);
+		}
+	}
+	// If cancel_at_period_end is false and active is false, the subscription was previously cancelled
+	else {
+		if (customerData && customerData.active === false) {
+			updateCustomer(eventData.customer, { active: true });
+			await slackSubscriptionRenewedNotification(
+				userData.email,
+				userData.firstName,
+				userData.lastName
 			);
 		}
 	}
@@ -280,6 +296,20 @@ async function getUserIDByCustomerID(customerID): Promise<string | null> {
 		if (data) return data.uid;
 	}
 	return null;
+}
+
+async function getCustomerData(customer: string) {
+	const customerDoc = await db.collection("customers").doc(customer).get();
+	if (!customerDoc.exists) return null;
+	else return customerDoc.data();
+}
+
+async function updateCustomer(customer: string, fields) {
+	await db.collection("customers").doc(customer).update(fields);
+	await db
+		.collection("customers")
+		.doc(customer)
+		.update({ lastUpdated: FieldValue.serverTimestamp() });
 }
 
 export default router;

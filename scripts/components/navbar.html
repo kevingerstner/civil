@@ -8,8 +8,6 @@
 
 	const auth = getAuth();
 
-	const stripePortalURL = "https://us-central1-civil-ed.cloudfunctions.net/api";
-
 	const registeredUI = document.querySelector("#registered-ui");
 	const unregisteredUI = document.querySelector("#unregistered-ui");
 
@@ -65,7 +63,7 @@
 		let token = auth.currentUser && (await auth.currentUser.getIdToken(true));
 		axios({
 			method: "post",
-			url: stripePortalURL + "/stripe/create-customer-portal-session",
+			url: API_URL + "/stripe/create-customer-portal-session",
 			headers: {
 				Authorization: `Bearer ${token}`,
 			},

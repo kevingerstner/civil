@@ -51,7 +51,37 @@ export async function slackSubscriptionCancelledNotification(
 	postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
 }
 
-// Posts a notification about the subscription
+export async function slackSubscriptionRenewedNotification(
+	email: string,
+	firstName: string,
+	lastName: string
+) {
+	const blocks = [
+		{
+			type: "header",
+			text: {
+				type: "plain_text",
+				text: `😅 ${firstName} Renewed their Subscription 😅`,
+			},
+		},
+		{
+			type: "section",
+			fields: [
+				{
+					type: "mrkdwn",
+					text: `*Email:*\n${email}`,
+				},
+				{
+					type: "mrkdwn",
+					text: `*Name:*\n${firstName} ${lastName}`,
+				},
+			],
+		},
+	];
+	const message = `😅 ${firstName} Renewed their Subscription 😅`;
+	postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
+}
+
 export async function slackSubscribeNotification(
 	email: string,
 	firstName: string,
