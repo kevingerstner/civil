@@ -82,8 +82,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
-	const token = await auth.currentUser.getIdToken();
-	sendRequest(event, `/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
+	sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
 		localStorage.setItem("userData", JSON.stringify(res.data));
 		userData = res.data;
 	});
@@ -131,7 +130,7 @@ async function updateUserProfile(event) {
  * SETTINGS
  * _)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-*/
 
-function setEmail(userData) {
+function setEmail() {
 	console.log("SETTING EMAIL FROM AUTH CURRENT USER");
 	EMAIL_FIELD.value = auth.currentUser.email;
 }
@@ -161,7 +160,6 @@ export async function updateSecurity(event) {
 			updatePassword(auth.currentUser, newPassword)
 				.then(() => {
 					// Updated Password
-					console.log("UPDATED PASSWORD");
 					updated = true;
 					showMessage(
 						passwordValidationMessage,
@@ -170,6 +168,7 @@ export async function updateSecurity(event) {
 					);
 					NEW_PASSWORD_FIELD.value = "";
 					CONFIRM_PASSWORD_FIELD.value = "";
+					disableSubmit();
 				})
 				.catch((err) => {
 					console.error(err.code);
@@ -181,14 +180,9 @@ export async function updateSecurity(event) {
 				});
 		}
 
-		const currentEmail = auth.currentUser.email;
-		console.log("EMAIL: " + email);
-		console.log("CURRENT EMAIL: " + currentEmail);
-
-		if (email && email !== currentEmail) {
+		if (email && email !== auth.currentUser.email) {
 			updateEmail(auth.currentUser, email)
 				.then(() => {
-					console.log("UPDATED EMAIL");
 					showMessage(
 						emailValidationMessage,
 						FormMessageType.Success,
@@ -346,10 +340,7 @@ function loadingSubmit(btnElement) {
 	btnElement.classList.add("disabled");
 }
 
-async function sendRequest(event, endpoint, method, data, params) {
-	event.preventDefault();
-	event.stopPropagation();
-
+async function sendRequest(endpoint, method, data, params) {
 	let token = auth.currentuser && (await auth.currentUser.getIdToken(true));
 	axios({
 		method,
