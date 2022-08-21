@@ -268,7 +268,7 @@ function validatePasswordOnBlur() {
 			"Passwords must be at least 6 characters."
 		);
 	} else {
-		hideMessasge(passwordValidationMessage);
+		hideMessage(passwordValidationMessage);
 	}
 }
 
