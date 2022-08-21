@@ -102,6 +102,10 @@ function setUserProfile(userData) {
 	LOCATION_FIELD.value = userData.location;
 }
 
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Edit Profile Tab
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
+
 async function updateUserProfile(event) {
 	event.preventDefault();
 	event.stopPropagation();
@@ -342,9 +346,11 @@ function loadingSubmit(btnElement) {
 
 async function sendRequest(endpoint, method, data, params) {
 	let token = auth.currentuser && (await auth.currentUser.getIdToken(true));
+	const url = API_URL + endpoint;
+	console.log(url);
 	axios({
 		method,
-		url: API_URL + endpoint,
+		url,
 		headers: {
 			Authorization: `Bearer ${token}`,
 		},
