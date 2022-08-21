@@ -10,9 +10,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
 const FormMessageType = {
-	Success,
-	Notify,
-	Error,
+	Success: "Success",
+	Notify: "Notify",
+	Error: "Error",
 };
 
 document.querySelectorAll(".w-form").forEach((element) => {
