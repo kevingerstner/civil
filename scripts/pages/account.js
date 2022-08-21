@@ -57,9 +57,9 @@ const SCHOOL_NAME_FIELD = profileForm.elements["school-name"];
 const LOCATION_FIELD = profileForm.elements["location"];
 
 // UI
-hide(confirmPassMessage);
-hide(passwordValidationMessage);
-hide(emailValidationMessage);
+hideMessage(confirmPassMessage);
+hideMessage(passwordValidationMessage);
+hideMessage(emailValidationMessage);
 disableSubmit(submitBtn);
 successMessage.style.display = "none";
 
@@ -262,9 +262,13 @@ function checkIfConfirmPasswordMatches() {
 
 function validatePasswordOnBlur() {
 	if (NEW_PASSWORD_FIELD.value.length > 0 && NEW_PASSWORD_FIELD.value.length < 6) {
-		show(passwordValidationMessage);
+		showMessage(
+			passwordValidationMessage,
+			FormMessageType.Error,
+			"Passwords must be at least 6 characters."
+		);
 	} else {
-		hide(passwordValidationMessage);
+		hideMessasge(passwordValidationMessage);
 	}
 }
 
@@ -272,10 +276,7 @@ async function reauthenticateUser(event) {
 	event.preventDefault();
 	event.stopPropagation();
 
-	console.log("Reauthenticating...");
-
-	reauthenticateMessage.innerHTML = "";
-	hide(reauthenticateMessage);
+	hideMessage(reauthenticateMessage);
 
 	const credential = EmailAuthProvider.credential(
 		auth.currentUser.email,
@@ -288,9 +289,7 @@ async function reauthenticateUser(event) {
 			formToSubmit.dispatchEvent(new Event("submit"));
 		})
 		.catch((err) => {
-			console.log(err);
-			reauthenticateMessage.innerHTML = getErrorMessage(err.code);
-			show(reauthenticateMessage);
+			showMessage(reauthenticateMessage, FormMessageType.Error, getErrorMessage(err.code));
 		});
 }
 
@@ -320,8 +319,8 @@ function showMessage(element, messageType, message) {
 			element.classList.add("success");
 			break;
 	}
-	element.innerHTML = "Password updated successfully.";
-	show(passwordValidationMessage);
+	element.innerHTML = message;
+	show(element);
 }
 
 function hideMessage(element) {
