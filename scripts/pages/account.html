@@ -8,53 +8,102 @@
 		sendEmailVerification,
 		EmailAuthProvider,
 		onAuthStateChanged,
+		updateEmail,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
-	// Errors
-	const passwordChangeErrors = {
-		WrongPassword: "auth/wrong-password",
-		WeakPassword: "auth/weak-password",
+	const FormMessageType = {
+		Success,
+		Notify,
+		Error,
 	};
 
-	// Elements
-	const firstNameField = document.getElementById("first-name-field");
-	const lastNameField = document.getElementById("last-name-field");
-	const emailAddressField = document.getElementById("email-address-field");
-	const jobTitleField = document.getElementById("job-title-field");
-	const schoolNameField = document.getElementById("School-Name");
-	const schoolLocationField = document.getElementById("School-Location");
+	document.querySelectorAll(".w-form").forEach((element) => {
+		element.classList.remove("w-form");
+	});
+
+	// PASSWORD & SECURITY TAB
+	const securityForm = document.querySelector("#security-form");
+	securityForm.addEventListener("submit", updateSecurity);
+
+	const NEW_PASSWORD_FIELD = securityForm.elements["new-password"];
+	const CONFIRM_PASSWORD_FIELD = securityForm.elements["confirm-password"];
+	const EMAIL_FIELD = securityForm.elements["email"];
+
+	const submitBtn = securityForm.querySelector('input[type="submit"]');
+
+	const emailValidationMessage = document.querySelector("#email-message");
+	const passwordValidationMessage = document.querySelector("#password-validation-message");
+	const confirmPassMessage = document.querySelector("#change-password-message");
+
+	NEW_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
+	NEW_PASSWORD_FIELD.addEventListener("blur", validatePasswordOnBlur);
+	CONFIRM_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
+	EMAIL_FIELD.addEventListener("keyup", validateEmailField);
+
+	// REAUTHENTICATE FORM
+	const reauthenticateForm = document.querySelector("#reauthenticate-form");
+	reauthenticateForm.addEventListener("submit", reauthenticateUser);
+	const reauthModal = document.querySelector("#reauth-modal");
+	const reauthenticateMessage = document.querySelector("#reauthenticate-message");
+
+	// PROFILE FORM
+	const profileForm = document.getElementById("profile-form");
+	profileForm.addEventListener("submit", updateUserProfile);
 	const submitButton = document.getElementById("submit-btn");
-	const profileForm = document.getElementById("personal-info");
 	const successMessage = document.getElementById("success");
 
-	// Events
-	profileForm.addEventListener("submit", updateUserProfile);
+	const FIRST_NAME_FIELD = profileForm.elements["first-name"];
+	const LAST_NAME_FIELD = profileForm.elements["last-name"];
+	const JOB_TITLE_FIELD = profileForm.elements["job-title"];
+	const SCHOOL_NAME_FIELD = profileForm.elements["school-name"];
+	const LOCATION_FIELD = profileForm.elements["location"];
 
-	//UI
+	// UI
+	hide(confirmPassMessage);
+	hide(passwordValidationMessage);
+	hide(emailValidationMessage);
+	disableSubmit(submitBtn);
 	successMessage.style.display = "none";
 
 	const auth = getAuth();
-	onAuthStateChanged(auth, (user) => {
-		if (user) setUserProfile();
+
+	const userData = JSON.parse(localStorage.getItem("userData"));
+	window.onload = () => {
+		setUserProfile(userData);
+		setEmail(userData);
+	};
+
+	onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			if (!userData) {
+				userData = await refreshUserData();
+				setUserProfile(userData);
+				setEmail(userData);
+			}
+		}
 	});
 
-	async function setUserProfile() {
+	async function refreshUserData() {
 		const token = await auth.currentUser.getIdToken();
-		axios
-			.get(
-				`https://us-central1-civil-ed.cloudfunctions.net/api/user/profile/${auth.currentUser.uid}`,
-				{
-					headers: { authorization: `Bearer ${token}` },
-				}
-			)
-			.then((res) => {
-				firstNameField.value = res.data.firstName;
-				lastNameField.value = res.data.lastName;
-				emailAddressField.value = res.data.email;
-				jobTitleField.value = res.data.jobTitle;
-				schoolNameField.value = res.data.schoolName;
-				schoolLocationField.value = res.data.location;
-			});
+		sendRequest(event, `/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
+			localStorage.setItem("userData", JSON.stringify(res.data));
+			userData = res.data;
+		});
+		return userData;
+	}
+
+	async function revokeUserData() {
+		localStorage.removeItem("userData");
+	}
+
+	function setUserProfile(userData) {
+		document.querySelector(".profile_name").innerText =
+			userData.firstName + " " + userData.lastName;
+		FIRST_NAME_FIELD.value = userData.firstName;
+		LAST_NAME_FIELD.value = userData.lastName;
+		JOB_TITLE_FIELD.value = userData.jobTitle;
+		SCHOOL_NAME_FIELD.value = userData.schoolName;
+		LOCATION_FIELD.value = userData.location;
 	}
 
 	async function updateUserProfile(event) {
@@ -66,27 +115,15 @@
 		submitButton.innerHTML = "Submitting...";
 		successMessage.style.display = "none";
 
-		const token = await auth.currentUser.getIdToken();
-
-		const body = {
-			firstName: firstNameField.value,
-			lastName: lastNameField.value,
-			jobTitle: jobTitleField.value,
-			schoolName: schoolNameField.value,
-			location: schoolLocationField.value,
-		};
-
-		axios
-			.post(
-				`https://us-central1-civil-ed.cloudfunctions.net/api/user/profile/${auth.currentUser.uid}`,
-				body,
-				{
-					headers: { authorization: `Bearer ${token}` },
-				}
-			)
-			.then((res) => {
-				successMessage.style.display = "block";
-			});
+		sendRequest(event, `/user/profile/${auth.currentUser.uid}`, "post", {
+			firstName: FIRST_NAME_FIELD.value,
+			lastName: LAST_NAME_FIELD.value,
+			jobTitle: JOB_TITLE_FIELD.value,
+			schoolName: SCHOOL_NAME_FIELD.value,
+			location: LOCATION_FIELD.value,
+		}).then(() => {
+			successMessage.style.display = "block";
+		});
 
 		// UI
 		submitButton.classList.remove("disabled");
@@ -97,29 +134,99 @@
 	 * SETTINGS
 	 * _)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-*/
 
-	// Elements
-	let changePasswordForm = document.getElementById("change-password-form");
-	const passwordValidationMessage = document.querySelector("#password-validation-message");
-	let confirmPassMessage = document.getElementById("change-password-message");
-	const formError = document.getElementById("change-pass-error");
-	const formErrorMessage = document.getElementById("change-pass-error-message");
-	const formSuccess = document.getElementById("change-pass-success");
-	const formSuccessMessage = document.getElementById("change-pass-success-message");
-	let submitBtn = document.getElementById("password-change-submit");
-	const loader = document.querySelector(".loading-spinner");
+	function setEmail(userData) {
+		console.log("SETTING EMAIL FROM AUTH CURRENT USER");
+		EMAIL_FIELD.value = auth.currentUser.email;
+	}
 
-	// Events
-	changePasswordForm.addEventListener("submit", changePassword);
-	document.getElementById("new-password").addEventListener("keyup", checkIfConfirmPasswordMatches);
-	document
-		.getElementById("confirm-new-password")
-		.addEventListener("keyup", checkIfConfirmPasswordMatches);
+	let formToSubmit = securityForm;
 
-	// UI
-	hide(confirmPassMessage);
-	hide(formError);
-	hide(formSuccess);
-	hide(loader);
+	/**
+	 * Change Password
+	 * Attempts to change the currently authenticated user's password to a new password.
+	 * @param {event} event
+	 */
+	export async function updateSecurity(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		let updated = false;
+
+		// UI
+		loadingSubmit(submitBtn);
+
+		if (auth.currentUser) {
+			// Get Form values
+			const newPassword = NEW_PASSWORD_FIELD.value;
+			const email = EMAIL_FIELD.value;
+
+			if (newPassword) {
+				updatePassword(auth.currentUser, newPassword)
+					.then(() => {
+						// Updated Password
+						console.log("UPDATED PASSWORD");
+						updated = true;
+						showMessage(
+							passwordValidationMessage,
+							FormMessageType.Success,
+							"Password updated successfully."
+						);
+						NEW_PASSWORD_FIELD.value = "";
+						CONFIRM_PASSWORD_FIELD.value = "";
+					})
+					.catch((err) => {
+						console.error(err.code);
+						if (err.code === "auth/requires-recent-login") {
+							formToSubmit = securityForm;
+							show(reauthModal);
+							enableSubmit(submitBtn);
+						}
+					});
+			}
+
+			const currentEmail = auth.currentUser.email;
+			console.log("EMAIL: " + email);
+			console.log("CURRENT EMAIL: " + currentEmail);
+
+			if (email && email !== currentEmail) {
+				updateEmail(auth.currentUser, email)
+					.then(() => {
+						console.log("UPDATED EMAIL");
+						showMessage(
+							emailValidationMessage,
+							FormMessageType.Success,
+							"Email updated successfully."
+						);
+						updated = true;
+					})
+					.catch((err) => {
+						console.error(err);
+						if (err.code === "auth/requires-recent-login") {
+							formToSubmit = securityForm;
+							show(reauthModal);
+							enableSubmit(submitBtn);
+						}
+					});
+			}
+		}
+		if (updated) {
+			revokeUserData();
+			disableSubmit(submitBtn);
+		} else enableSubmit(submitBtn);
+		return false;
+	}
+
+	function validateEmailField() {
+		enableSubmit(submitBtn);
+		const email = EMAIL_FIELD.value;
+		if (!email) {
+			emailValidationMessage.innerHTML = "This field is required!";
+			show(emailValidationMessage);
+		} else {
+			emailValidationMessage.innerHTML = "";
+			hide(emailValidationMessage);
+		}
+	}
 
 	/**
 	 * Function that checks if the newPassword field matches the confirmNewPassword
@@ -127,75 +234,67 @@
 	 */
 	function checkIfConfirmPasswordMatches() {
 		// Form Elements
-		let newPassword = changePasswordForm.elements["new-password"].value;
-		let confirmNewPassword = changePasswordForm.elements["confirm-new-password"].value;
+		let newPass = NEW_PASSWORD_FIELD.value;
+		let confirmPass = CONFIRM_PASSWORD_FIELD.value;
 
-		if (newPassword.length >= 6) {
-			hide(passwordValidationMessage);
-		} else {
-			show(passwordValidationMessage);
+		// if both password fields are filled and match, remove errors and enable btn
+		if (newPass === confirmPass && confirmPass !== "" && newPass !== "") {
+			hideMessage(confirmPassMessage);
+			enableSubmit(submitBtn);
 		}
-
-		// Match New Password to Confirm New Password
-		// if both password fields are not empty and match, remove errors and enable btn
-		if (newPassword === confirmNewPassword && confirmNewPassword !== "" && newPassword !== "") {
-			confirmPassMessage.innerHTML = "";
-			hide(confirmPassMessage);
-			submitBtn.classList.remove("disabled");
+		// if only one field is empty, hide error and disable btn
+		else if ((confirmPass !== "" && newPass === "") || (confirmPass === "" && newPass !== "")) {
+			hideMessage(confirmPassMessage);
+			disableSubmit(submitBtn);
 		}
-		// if either field is empty, hide error and disable btn
-		else if (confirmNewPassword === "" || newPassword === "") {
-			confirmPassMessage.innerHTML = "";
-			hide(confirmPassMessage);
-			submitBtn.classList.add("disabled");
+		// If both fields are empty, hide messages and enable submit
+		else if (confirmPass === "" && newPass === "") {
+			hideMessage(confirmPassMessage);
+			enableSubmit(submitBtn);
 		}
-		// if both fields are not empty but passwords don't match
+		// if both fields are filled but passwords don't match
 		else {
-			confirmPassMessage.innerHTML = "Confirm password must match new password.";
-			show(confirmPassMessage);
-			submitBtn.classList.add("disabled");
+			showMessage(
+				confirmPassMessage,
+				FormMessageType.Error,
+				"Confirm password must match new password."
+			);
+			disableSubmit(submitBtn);
 		}
 	}
 
-	/**
-	 * Change Password
-	 * Attempts to change the currently authenticated user's password to a new password.
-	 * @param {event} event
-	 */
-	function changePassword(event) {
+	function validatePasswordOnBlur() {
+		if (NEW_PASSWORD_FIELD.value.length > 0 && NEW_PASSWORD_FIELD.value.length < 6) {
+			show(passwordValidationMessage);
+		} else {
+			hide(passwordValidationMessage);
+		}
+	}
+
+	async function reauthenticateUser(event) {
 		event.preventDefault();
 		event.stopPropagation();
 
-		hide(formError);
-		hide(submitBtn);
-		show(loader);
+		console.log("Reauthenticating...");
 
-		if (auth.currentUser) {
-			// Get Form values
-			let currentPassword = changePasswordForm.elements["current-password"].value;
-			let newPassword = changePasswordForm.elements["new-password"].value;
+		reauthenticateMessage.innerHTML = "";
+		hide(reauthenticateMessage);
 
-			// Firebase requires reauthentication before updating a password - we use the currentPassword form field to do this
-			const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+		const credential = EmailAuthProvider.credential(
+			auth.currentUser.email,
+			reauthenticateForm.elements["password"].value
+		);
 
-			reauthenticateWithCredential(auth.currentUser, credential)
-				.then(() => {
-					updatePassword(auth.currentUser, newPassword).then(() => {
-						// Updated Password
-						formSuccessMessage.innerHTML = "Password updated successfully!";
-						formSuccess.style.display = "flex";
-					});
-				})
-				.catch((error) => {
-					console.log(error.message);
-					formErrorMessage.innerHTML = getErrorMessage(error.code);
-					show(formError);
-					show(submitBtn);
-				})
-				.finally(() => {
-					hide(loader);
-				});
-		}
+		await reauthenticateWithCredential(auth.currentUser, credential)
+			.then(() => {
+				hide(reauthModal);
+				formToSubmit.dispatchEvent(new Event("submit"));
+			})
+			.catch((err) => {
+				console.log(err);
+				reauthenticateMessage.innerHTML = getErrorMessage(err.code);
+				show(reauthenticateMessage);
+			});
 	}
 
 	/**
@@ -205,20 +304,71 @@
 	 */
 	function getErrorMessage(errorCode) {
 		switch (errorCode) {
-			case passwordChangeErrors.WrongPassword:
-				return "Current password is incorrect. Please try again.";
-			case passwordChangeErrors.WeakPassword:
+			case "auth/wrong-password":
+				return "Password is incorrect. Please try again.";
+			case "auth/weak-password":
 				return "New password must be at least 6 characters.";
 			default:
 				return "An error occurred. Please try again.";
 		}
 	}
 
-	function show(element) {
-		element.style.display = "block";
+	function showMessage(element, messageType, message) {
+		element.classList.remove("success", "error");
+		switch (messageType) {
+			case FormMessageType.Error:
+				element.classList.add("error");
+				break;
+			case FormMessageType.Success:
+				element.classList.add("success");
+				break;
+		}
+		element.innerHTML = "Password updated successfully.";
+		show(passwordValidationMessage);
 	}
 
-	function hide(element) {
-		element.style.display = "none";
+	function hideMessage(element) {
+		hide(element);
+		element.innerHTML = "";
+	}
+
+	function enableSubmit(btnElement) {
+		btnElement.value = "Save Changes";
+		btnElement.disabled = false;
+		btnElement.classList.remove("disabled");
+	}
+
+	function disableSubmit(btnElement) {
+		btnElement.value = "Saved";
+		btnElement.disabled = true;
+		btnElement.classList.add("disabled");
+	}
+
+	function loadingSubmit(btnElement) {
+		btnElement.value = "Saving...";
+		btnElement.disabled = true;
+		btnElement.classList.add("disabled");
+	}
+
+	async function sendRequest(event, endpoint, method, data, params) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		let token = auth.currentuser && (await auth.currentUser.getIdToken(true));
+		axios({
+			method,
+			url: API_URL + endpoint,
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+			data,
+			params,
+		})
+			.then((res) => {
+				return res;
+			})
+			.catch((err) => {
+				console.error(err);
+			});
 	}
 </script>
