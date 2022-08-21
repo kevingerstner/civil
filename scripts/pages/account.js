@@ -115,7 +115,7 @@ async function updateUserProfile(event) {
 	submitButton.innerHTML = "Submitting...";
 	successMessage.style.display = "none";
 
-	sendRequest(event, `/user/profile/${auth.currentUser.uid}`, "post", {
+	sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", {
 		firstName: FIRST_NAME_FIELD.value,
 		lastName: LAST_NAME_FIELD.value,
 		jobTitle: JOB_TITLE_FIELD.value,
@@ -346,11 +346,9 @@ function loadingSubmit(btnElement) {
 
 async function sendRequest(endpoint, method, data, params) {
 	let token = auth.currentuser && (await auth.currentUser.getIdToken(true));
-	const url = API_URL + endpoint;
-	console.log(url);
 	axios({
 		method,
-		url,
+		url: API_URL + endpoint,
 		headers: {
 			Authorization: `Bearer ${token}`,
 		},
