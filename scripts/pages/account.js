@@ -148,7 +148,7 @@ async function detectChanges(event) {
 	let userData = localStorage.getItem("userData");
 	if (!userData) userData = await refreshUserData();
 
-	form.elements
+	Array.from(form.elements)
 		.filter((field) => {
 			field.type !== "submit";
 		})
