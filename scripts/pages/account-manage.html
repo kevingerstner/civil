@@ -17,6 +17,7 @@
 	const passResetUI = document.getElementById("password-reset");
 	const passResetSuccessUI = document.getElementById("password-reset-success-ui");
 	const passResetErrorUI = document.getElementById("password-reset-error-ui");
+	const recoverEmailUI = document.getElementById("recover-email-ui");
 
 	const actionHandlerElements = [
 		emailVerifiedUI,
@@ -24,6 +25,7 @@
 		passResetUI,
 		passResetSuccessUI,
 		passResetErrorUI,
+		recoverEmailUI,
 	];
 
 	const urlParams = new URLSearchParams(window.location.search);
@@ -218,6 +220,7 @@
 
 	function handleRecoverEmail() {
 		console.log("haven't handled recover email yet.");
+		showActionUI(recoverEmailUI);
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=

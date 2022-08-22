@@ -78,11 +78,11 @@ const auth = getAuth();
 let token;
 
 let userData = localStorage.getItem("userData");
-if (userData) userData = JSON.parse(userData);
-window.onload = () => {
+if (userData) {
+	userData = JSON.parse(userData);
 	setUserProfile(userData);
 	setEmail(userData);
-};
+}
 
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
@@ -311,7 +311,7 @@ function validatePasswordOnBlur() {
 }
 
 function setEmail() {
-	EMAIL_FIELD.value = auth.currentUser.email;
+	if (auth.currentUser) EMAIL_FIELD.value = auth.currentUser.email;
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
