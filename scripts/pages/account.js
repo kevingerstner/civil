@@ -142,18 +142,21 @@ async function updateUserProfile(event) {
 		});
 }
 
-function detectChanges(form) {
+async function detectChanges(form) {
 	let changed = false;
 	let userData = localStorage.getItem(userData);
-	if(!userData) userData = await refreshUserData();
+	if (!userData) userData = await refreshUserData();
 
-	form.elements.filter((field) => { field.type !== "submit"}).forEach((input) => {
-		if(input.value !== userData[input.name])
-			changed = true;
-	})
+	form.elements
+		.filter((field) => {
+			field.type !== "submit";
+		})
+		.forEach((input) => {
+			if (input.value !== userData[input.name]) changed = true;
+		});
 
 	console.log("CHANGED: " + changed);
-	if(changed) {
+	if (changed) {
 		enableSubmit(PROFILE_SUBMIT);
 	} else {
 		disableSubmit(PROFILE_SUBMIT);
