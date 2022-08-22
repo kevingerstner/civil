@@ -27,7 +27,7 @@ const NEW_PASSWORD_FIELD = securityForm.elements["new-password"];
 const CONFIRM_PASSWORD_FIELD = securityForm.elements["confirm-password"];
 const EMAIL_FIELD = securityForm.elements["email"];
 
-const submitBtn = securityForm.querySelector('input[type="submit"]');
+const SECURITY_SUBMIT = securityForm.querySelector('input[type="submit"]');
 
 const emailValidationMessage = document.querySelector("#email-message");
 const passwordValidationMessage = document.querySelector("#password-validation-message");
@@ -38,17 +38,16 @@ NEW_PASSWORD_FIELD.addEventListener("blur", validatePasswordOnBlur);
 CONFIRM_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
 EMAIL_FIELD.addEventListener("keyup", validateEmailField);
 
-// REAUTHENTICATE FORM
-const reauthenticateForm = document.querySelector("#reauthenticate-form");
-reauthenticateForm.addEventListener("submit", reauthenticateUser);
-const reauthModal = document.querySelector("#reauth-modal");
-const reauthenticateMessage = document.querySelector("#reauthenticate-message");
+hideMessage(confirmPassMessage);
+hideMessage(passwordValidationMessage);
+hideMessage(emailValidationMessage);
+disableSubmit(SECURITY_SUBMIT);
 
 // PROFILE FORM
 const profileForm = document.getElementById("profile-form");
 profileForm.addEventListener("submit", updateUserProfile);
-const submitButton = document.getElementById("submit-btn");
-const successMessage = document.getElementById("success");
+
+const PROFILE_SUBMIT = profileForm.querySelector('input[type="submit"]');
 
 const FIRST_NAME_FIELD = profileForm.elements["first-name"];
 const LAST_NAME_FIELD = profileForm.elements["last-name"];
@@ -56,12 +55,20 @@ const JOB_TITLE_FIELD = profileForm.elements["job-title"];
 const SCHOOL_NAME_FIELD = profileForm.elements["school-name"];
 const LOCATION_FIELD = profileForm.elements["location"];
 
-// UI
-hideMessage(confirmPassMessage);
-hideMessage(passwordValidationMessage);
-hideMessage(emailValidationMessage);
-disableSubmit(submitBtn);
-successMessage.style.display = "none";
+const profileMessage = document.querySelector("#profile-message");
+
+hideMessage(profileMessage);
+disableSubmit(PROFILE_SUBMIT);
+
+// REAUTHENTICATE FORM
+const reauthenticateForm = document.querySelector("#reauthenticate-form");
+reauthenticateForm.addEventListener("submit", reauthenticateUser);
+const reauthModal = document.querySelector("#reauth-modal");
+const reauthenticateMessage = document.querySelector("#reauthenticate-message");
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Initialization
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 const auth = getAuth();
 let token;
@@ -75,7 +82,6 @@ window.onload = () => {
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		token = await user.getIdToken();
-		console.log("TOKEN: " + token);
 		if (!userData) {
 			userData = await refreshUserData();
 			setUserProfile(userData);
@@ -96,6 +102,10 @@ async function revokeUserData() {
 	localStorage.removeItem("userData");
 }
 
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Edit Profile Tab
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
+
 function setUserProfile(userData) {
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
@@ -105,18 +115,12 @@ function setUserProfile(userData) {
 	LOCATION_FIELD.value = userData.location;
 }
 
-/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * Edit Profile Tab
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
-
 async function updateUserProfile(event) {
 	event.preventDefault();
 	event.stopPropagation();
 
-	// UI
-	submitButton.classList.add("disabled");
-	submitButton.innerHTML = "Submitting...";
-	successMessage.style.display = "none";
+	loadingSubmit(PROFILE_SUBMIT);
+	hideMessage(profileMessage);
 
 	sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", {
 		firstName: FIRST_NAME_FIELD.value,
@@ -124,25 +128,23 @@ async function updateUserProfile(event) {
 		jobTitle: JOB_TITLE_FIELD.value,
 		schoolName: SCHOOL_NAME_FIELD.value,
 		location: LOCATION_FIELD.value,
-	}).then(() => {
-		successMessage.style.display = "block";
-	});
-
-	// UI
-	submitButton.classList.remove("disabled");
-	submitButton.innerHTML = "Save Changes";
+	})
+		.then(() => {
+			showMessage(profileMessage, FormMessageType.Success, "Profile updated!");
+			disableSubmit(PROFILE_SUBMIT);
+			refreshUserData();
+		})
+		.catch((err) => {
+			showMessage(profileMessage, FormMessageType.Error, getErrorMessage(err.code));
+			enableSubmit(PROFILE_SUBMIT);
+		});
 }
 
-/* _)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-
- * SETTINGS
- * _)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-_)-*/
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Password & Security Tab
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
-function setEmail() {
-	console.log("SETTING EMAIL FROM AUTH CURRENT USER");
-	EMAIL_FIELD.value = auth.currentUser.email;
-}
-
-let formToSubmit = securityForm;
+let formToSubmit;
 
 /**
  * Change Password
@@ -156,7 +158,7 @@ export async function updateSecurity(event) {
 	let updated = false;
 
 	// UI
-	loadingSubmit(submitBtn);
+	loadingSubmit(SECURITY_SUBMIT);
 
 	if (auth.currentUser) {
 		// Get Form values
@@ -182,7 +184,7 @@ export async function updateSecurity(event) {
 					if (err.code === "auth/requires-recent-login") {
 						formToSubmit = securityForm;
 						show(reauthModal);
-						enableSubmit(submitBtn);
+						enableSubmit(SECURITY_SUBMIT);
 					}
 				});
 		}
@@ -202,20 +204,20 @@ export async function updateSecurity(event) {
 					if (err.code === "auth/requires-recent-login") {
 						formToSubmit = securityForm;
 						show(reauthModal);
-						enableSubmit(submitBtn);
+						enableSubmit(SECURITY_SUBMIT);
 					}
 				});
 		}
 	}
 	if (updated) {
 		revokeUserData();
-		disableSubmit(submitBtn);
-	} else enableSubmit(submitBtn);
+		disableSubmit(SECURITY_SUBMIT);
+	} else enableSubmit(SECURITY_SUBMIT);
 	return false;
 }
 
 function validateEmailField() {
-	enableSubmit(submitBtn);
+	enableSubmit(SECURITY_SUBMIT);
 	const email = EMAIL_FIELD.value;
 	if (!email) {
 		emailValidationMessage.innerHTML = "This field is required!";
@@ -238,17 +240,17 @@ function checkIfConfirmPasswordMatches() {
 	// if both password fields are filled and match, remove errors and enable btn
 	if (newPass === confirmPass && confirmPass !== "" && newPass !== "") {
 		hideMessage(confirmPassMessage);
-		enableSubmit(submitBtn);
+		enableSubmit(SECURITY_SUBMIT);
 	}
 	// if only one field is empty, hide error and disable btn
 	else if ((confirmPass !== "" && newPass === "") || (confirmPass === "" && newPass !== "")) {
 		hideMessage(confirmPassMessage);
-		disableSubmit(submitBtn);
+		disableSubmit(SECURITY_SUBMIT);
 	}
 	// If both fields are empty, hide messages and enable submit
 	else if (confirmPass === "" && newPass === "") {
 		hideMessage(confirmPassMessage);
-		enableSubmit(submitBtn);
+		enableSubmit(SECURITY_SUBMIT);
 	}
 	// if both fields are filled but passwords don't match
 	else {
@@ -257,7 +259,7 @@ function checkIfConfirmPasswordMatches() {
 			FormMessageType.Error,
 			"Confirm password must match new password."
 		);
-		disableSubmit(submitBtn);
+		disableSubmit(SECURITY_SUBMIT);
 	}
 }
 
@@ -272,6 +274,15 @@ function validatePasswordOnBlur() {
 		hideMessage(passwordValidationMessage);
 	}
 }
+
+function setEmail() {
+	console.log("SETTING EMAIL FROM AUTH CURRENT USER");
+	EMAIL_FIELD.value = auth.currentUser.email;
+}
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Reauthenticate Modal
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 async function reauthenticateUser(event) {
 	event.preventDefault();
@@ -293,6 +304,10 @@ async function reauthenticateUser(event) {
 			showMessage(reauthenticateMessage, FormMessageType.Error, getErrorMessage(err.code));
 		});
 }
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Helper Functions
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 /**
  * Returns a verbal description of the given error code
