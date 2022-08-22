@@ -30,7 +30,7 @@ const EMAIL_FIELD = securityForm.elements["email"];
 const SECURITY_SUBMIT = securityForm.querySelector('input[type="submit"]');
 
 const emailValidationMessage = document.querySelector("#email-message");
-const passwordValidationMessage = document.querySelector("#password-validation-message");
+const passwordMessage = document.querySelector("#password-validation-message");
 const confirmPassMessage = document.querySelector("#change-password-message");
 
 NEW_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
@@ -40,7 +40,7 @@ EMAIL_FIELD.addEventListener("keyup", validateEmailField);
 securityForm.addEventListener("change", detectChanges);
 
 hideMessage(confirmPassMessage);
-hideMessage(passwordValidationMessage);
+hideMessage(passwordMessage);
 hideMessage(emailValidationMessage);
 disableSubmit(SECURITY_SUBMIT);
 
@@ -191,7 +191,7 @@ async function detectChanges(event) {
 let formToSubmit;
 
 /**
- * Change Password
+ * Change Password, Change Email
  * Attempts to change the currently authenticated user's password to a new password.
  * @param {event} event
  */
@@ -200,39 +200,32 @@ export async function updateSecurity(event) {
 	event.preventDefault();
 	event.stopPropagation();
 
-	let updated = false;
-
-	// UI
 	loadingSubmit(SECURITY_SUBMIT);
 
 	if (auth.currentUser) {
-		// Get Form values
 		const newPassword = NEW_PASSWORD_FIELD.value;
 		const email = EMAIL_FIELD.value;
 
+		// UPDATE PASSWORD
+		try {
+		} catch (err) {
+			console.error(err);
+			showMessage(passwordMessage, FormMessageType.Error, err);
+			if (err.code === "auth/requires-recent-login") {
+				formToSubmit = securityForm;
+				show(reauthModal);
+				enableSubmit(SECURITY_SUBMIT);
+			}
+		}
 		if (newPassword) {
 			updatePassword(auth.currentUser, newPassword)
 				.then(() => {
-					// Updated Password
-					updated = true;
-					showMessage(
-						passwordValidationMessage,
-						FormMessageType.Success,
-						"Password updated successfully."
-					);
+					showMessage(passwordMessage, FormMessageType.Success, "Password updated successfully.");
 					NEW_PASSWORD_FIELD.value = "";
 					CONFIRM_PASSWORD_FIELD.value = "";
 					disableSubmit(SECURITY_SUBMIT);
 				})
-				.catch((err) => {
-					console.error(err);
-					showMessage(passwordValidationMessage, FormMessageType.Error, err);
-					if (err.code === "auth/requires-recent-login") {
-						formToSubmit = securityForm;
-						show(reauthModal);
-						enableSubmit(SECURITY_SUBMIT);
-					}
-				});
+				.catch((err) => {});
 		}
 
 		if (email && email !== auth.currentUser.email) {
@@ -244,9 +237,9 @@ export async function updateSecurity(event) {
 						FormMessageType.Success,
 						"Email updated successfully."
 					);
+					disableSubmit(SECURITY_SUBMIT);
 					await sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", { email });
 					await refreshUserData();
-					disableSubmit(SECURITY_SUBMIT);
 				})
 				.catch((err) => {
 					console.error(err);
@@ -260,9 +253,12 @@ export async function updateSecurity(event) {
 	}
 }
 
+/**
+ * Validate Email Field
+ * Makes sure the email field is filled
+ */
 function validateEmailField() {
-	const email = EMAIL_FIELD.value;
-	if (!email) {
+	if (!EMAIL_FIELD.value) {
 		showMessage(emailValidationMessage, FormMessageType.Error, "This field is required!");
 		disableSubmit(SECURITY_SUBMIT);
 	} else {
@@ -272,7 +268,8 @@ function validateEmailField() {
 }
 
 /**
- * Function that checks if the newPassword field matches the confirmNewPassword
+ * Check if Confirm Password Matches
+ * Checks if the newPassword field matches the confirmNewPassword
  * and handles UI to show the state.
  */
 function checkIfConfirmPasswordMatches() {
@@ -308,18 +305,13 @@ function checkIfConfirmPasswordMatches() {
 
 function validatePasswordOnBlur() {
 	if (NEW_PASSWORD_FIELD.value.length > 0 && NEW_PASSWORD_FIELD.value.length < 6) {
-		showMessage(
-			passwordValidationMessage,
-			FormMessageType.Error,
-			"Passwords must be at least 6 characters."
-		);
+		showMessage(passwordMessage, FormMessageType.Error, "Passwords must be at least 6 characters.");
 	} else {
-		hideMessage(passwordValidationMessage);
+		hideMessage(passwordMessage);
 	}
 }
 
 function setEmail() {
-	console.log("SET EMAIL");
 	EMAIL_FIELD.value = userData.email;
 }
 
@@ -347,6 +339,26 @@ async function reauthenticateUser(event) {
 			showMessage(reauthenticateMessage, FormMessageType.Error, getErrorMessage(err.code));
 		});
 }
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Remember Tab
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
+
+function activateTab(tab) {
+	document.querySelectorAll(".w--current").removeClass("w--current");
+	//switch this tab on
+	tab.addClass("w--current");
+}
+
+var index = parseInt(localStorage.getItem('tab' || '0'));
+activateTab(document.querySelectorAll(".w-tab-link")[index]);
+
+document.querySelectorAll(".w-tab-link").forEach((tab, index) => {
+	tab.addEventListener("click", () => {
+		localStorage.setItem('tab') = index;
+		activate(this);
+	});
+});
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * Helper Functions
