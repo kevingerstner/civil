@@ -134,7 +134,7 @@ async function updateUserProfile(event) {
 		schoolName: SCHOOL_NAME_FIELD.value,
 		location: LOCATION_FIELD.value,
 	})
-		.then(() => {
+		.then(async () => {
 			showMessage(profileMessage, FormMessageType.Success, "Profile updated!");
 			disableSubmit(PROFILE_SUBMIT);
 			await refreshUserData();
