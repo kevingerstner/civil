@@ -121,7 +121,7 @@ async function revokeUserData() {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 function setUserProfile() {
-	if (!userProfile) return console.error("Profile not set.");
+	if (!userData) return console.error("Profile not set.");
 
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
