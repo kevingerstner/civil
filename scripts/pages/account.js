@@ -238,13 +238,13 @@ export async function updateSecurity(event) {
 		if (email && email !== auth.currentUser.email) {
 			console.log("UPDATING EMAIL");
 			updateEmail(auth.currentUser, email)
-				.then(() => {
+				.then(async () => {
 					showMessage(
 						emailValidationMessage,
 						FormMessageType.Success,
 						"Email updated successfully."
 					);
-					await sendRequest(`/user/profile/${auth.currentUser.uid}`, 'post', {email});
+					await sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", { email });
 					updated = true;
 				})
 				.catch((err) => {
