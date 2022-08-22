@@ -110,8 +110,10 @@ async function refreshUserData() {
 	// 	.catch((err) => {
 	// 		console.error(err);
 	// 	});
-	sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
+	await sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
 		console.log("RES: " + res);
+		localStorage.setItem("userData", JSON.stringify(res.data));
+		userData = res.data;
 	});
 }
 
