@@ -75,7 +75,8 @@ const reauthenticateMessage = document.querySelector("#reauthenticate-message");
 const auth = getAuth();
 let token;
 
-let userData = JSON.parse(localStorage.getItem("userData"));
+let userData = localStorage.getItem("userData");
+if (userData) userData = JSON.parse(userData);
 window.onload = () => {
 	setUserProfile(userData);
 	setEmail(userData);
