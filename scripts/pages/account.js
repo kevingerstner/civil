@@ -98,7 +98,7 @@ onAuthStateChanged(auth, async (user) => {
 
 async function refreshUserData() {
 	console.log("REFRESHING USER DATA");
-	axios({
+	await axios({
 		method: "get",
 		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
 		headers: {
