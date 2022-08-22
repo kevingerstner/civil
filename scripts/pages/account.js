@@ -320,7 +320,7 @@ function validatePasswordOnBlur() {
 
 function setEmail() {
 	console.log("SET EMAIL");
-	if (auth.currentUser) EMAIL_FIELD.value = auth.currentUser.email;
+	EMAIL_FIELD.value = userData.email;
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
