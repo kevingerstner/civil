@@ -142,7 +142,8 @@ async function updateUserProfile(event) {
 		});
 }
 
-async function detectChanges(form) {
+async function detectChanges(event) {
+	const form = event.currentTarget;
 	let changed = false;
 	let userData = localStorage.getItem("userData");
 	if (!userData) userData = await refreshUserData();
