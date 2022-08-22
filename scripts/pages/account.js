@@ -85,9 +85,12 @@ onAuthStateChanged(auth, async (user) => {
 		token = await user.getIdToken();
 		if (!userData) {
 			await refreshUserData();
+			setUserProfile();
+			setEmail();
+		} else {
+			setUserProfile();
+			setEmail();
 		}
-		setUserProfile();
-		setEmail();
 	}
 });
 
@@ -118,6 +121,8 @@ async function revokeUserData() {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 function setUserProfile() {
+	if (!userProfile) return console.error("Profile not set.");
+
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
 	LAST_NAME_FIELD.value = userData.lastName;
