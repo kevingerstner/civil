@@ -167,8 +167,12 @@ async function detectChanges(event) {
 
 	Array.from(form.elements).forEach((input) => {
 		if (input.type !== "submit") {
-			if (input.value !== userData[input.name]) {
-				changed = true;
+			if (userData[input.name]) {
+				if (input.value !== userData[input.name]) {
+					changed = true;
+				}
+			} else {
+				if (input.value !== "") changed = true;
 			}
 		}
 	});
@@ -240,6 +244,7 @@ export async function updateSecurity(event) {
 						FormMessageType.Success,
 						"Email updated successfully."
 					);
+					await sendRequest(`/user/profile/${auth.currentUser.uid}`, 'post', {email});
 					updated = true;
 				})
 				.catch((err) => {
@@ -264,8 +269,10 @@ function validateEmailField() {
 	const email = EMAIL_FIELD.value;
 	if (!email) {
 		showMessage(emailValidationMessage, FormMessageType.Error, "This field is required!");
+		disableSubmit(SECURITY_SUBMIT);
 	} else {
 		hideMessage(emailValidationMessage);
+		enableSubmit(SECURITY_SUBMIT);
 	}
 }
 

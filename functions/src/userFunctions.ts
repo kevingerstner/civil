@@ -52,16 +52,17 @@ export async function getUserData(uid: string): Promise<any> {
 
 router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	const uid = req.params.uid;
+	let data;
+	if (req.body.firstName) data.firstName = req.body.firstName;
+	if (req.body.lastName) data.lastName = req.body.lastName;
+	if (req.body.schoolName) data.schoolName = req.body.schoolName;
+	if (req.body.location) data.location = req.body.location;
+	if (req.body.jobTitle) data.jobTitle = req.body.jobTitle;
+	if (req.body.email) data.email = req.body.email;
 
 	db.collection("users")
 		.doc(uid)
-		.update({
-			firstName: req.body.firstName,
-			lastName: req.body.lastName,
-			schoolName: req.body.schoolName,
-			location: req.body.location,
-			jobTitle: req.body.jobTitle,
-		})
+		.update(data)
 		.then((result) => {
 			console.log("Success: Updated user information", result);
 			res.status(200).send("Updated profile successfully");
