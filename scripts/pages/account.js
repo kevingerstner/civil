@@ -64,6 +64,7 @@ disableSubmit(submitBtn);
 successMessage.style.display = "none";
 
 const auth = getAuth();
+let token;
 
 const userData = JSON.parse(localStorage.getItem("userData"));
 window.onload = () => {
@@ -73,6 +74,8 @@ window.onload = () => {
 
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
+		token = await user.getIdToken();
+		console.log("TOKEN: " + token);
 		if (!userData) {
 			userData = await refreshUserData();
 			setUserProfile(userData);
@@ -345,7 +348,6 @@ function loadingSubmit(btnElement) {
 }
 
 async function sendRequest(endpoint, method, data, params) {
-	let token = auth.currentuser && (await auth.currentUser.getIdToken(true));
 	axios({
 		method,
 		url: API_URL + endpoint,
