@@ -84,12 +84,10 @@ onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		token = await user.getIdToken();
 		if (!userData) {
-			console.log("no user data");
 			await refreshUserData();
 			setUserProfile();
 			setEmail();
 		} else {
-			console.log("user data initialized");
 			setUserProfile();
 			setEmail();
 		}
@@ -97,14 +95,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
-	console.log("REFRESHING USER DATA");
-	await axios({
-		method: "get",
-		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
-	})
+	await sendRequest(`/user/profile/${auth.currentUser.uid}`, "get", null, null)
 		.then((res) => {
 			console.log("USER DATA: " + res);
 			localStorage.setItem("userData", JSON.stringify(res.data));
@@ -113,6 +104,21 @@ async function refreshUserData() {
 		.catch((err) => {
 			console.error(err);
 		});
+	// await axios({
+	// 	method: "get",
+	// 	url: API_URL + `/user/profile/${auth.currentUser.uid}`,
+	// 	headers: {
+	// 		Authorization: `Bearer ${token}`,
+	// 	},
+	// })
+	// 	.then((res) => {
+	// 		console.log("USER DATA: " + res);
+	// 		localStorage.setItem("userData", JSON.stringify(res.data));
+	// 		userData = res.data;
+	// 	})
+	// 	.catch((err) => {
+	// 		console.error(err);
+	// 	});
 }
 
 async function revokeUserData() {
@@ -124,7 +130,6 @@ async function revokeUserData() {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 function setUserProfile() {
-	console.log("SETTING USER PROFILE");
 	if (!userData) return console.log("Profile not set.");
 
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
