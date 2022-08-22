@@ -78,16 +78,19 @@ const auth = getAuth();
 let token;
 
 let userData = localStorage.getItem("userData");
-if (userData) userData = JSON.parse(userData);
+if (userData) {
+	console.log("user data is already set");
+	userData = JSON.parse(userData);
+	setUserProfile();
+	setEmail();
+}
 
 onAuthStateChanged(auth, async (user) => {
+	console.log("AUTH STATE CHANGED");
 	if (user) {
 		token = await user.getIdToken();
 		if (!userData) {
 			await refreshUserData();
-			setUserProfile();
-			setEmail();
-		} else {
 			setUserProfile();
 			setEmail();
 		}
@@ -95,6 +98,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
+	console.log("REFRESHING USER DATA");
 	await axios({
 		method: "get",
 		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
@@ -187,6 +191,7 @@ let formToSubmit;
  * @param {event} event
  */
 export async function updateSecurity(event) {
+	console.log("UPDATING SECURITY");
 	event.preventDefault();
 	event.stopPropagation();
 
@@ -226,6 +231,7 @@ export async function updateSecurity(event) {
 		}
 
 		if (email && email !== auth.currentUser.email) {
+			console.log("UPDATING EMAIL");
 			updateEmail(auth.currentUser, email)
 				.then(() => {
 					showMessage(
@@ -246,6 +252,7 @@ export async function updateSecurity(event) {
 		}
 	}
 	if (updated) {
+		console.log("REVOKED USER DATA");
 		revokeUserData();
 		disableSubmit(SECURITY_SUBMIT);
 	} else enableSubmit(SECURITY_SUBMIT);
@@ -312,6 +319,7 @@ function validatePasswordOnBlur() {
 }
 
 function setEmail() {
+	console.log("SET EMAIL");
 	if (auth.currentUser) EMAIL_FIELD.value = auth.currentUser.email;
 }
 
