@@ -78,20 +78,16 @@ const auth = getAuth();
 let token;
 
 let userData = localStorage.getItem("userData");
-if (userData) {
-	userData = JSON.parse(userData);
-	setUserProfile(userData);
-	setEmail();
-}
+if (userData) userData = JSON.parse(userData);
 
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		token = await user.getIdToken();
 		if (!userData) {
 			await refreshUserData();
-			setUserProfile(userData);
-			setEmail();
 		}
+		setUserProfile();
+		setEmail();
 	}
 });
 
@@ -121,7 +117,7 @@ async function revokeUserData() {
  * Edit Profile Tab
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
-function setUserProfile(userData) {
+function setUserProfile() {
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
 	LAST_NAME_FIELD.value = userData.lastName;
