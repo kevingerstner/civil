@@ -33,7 +33,7 @@ router.get("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	const uid = req.params.uid;
 	const profileData = await getUserData(uid);
 	functions.logger.log(profileData);
-	return res.status(200).json(profileData);
+	res.status(200).json(profileData);
 });
 
 /**
