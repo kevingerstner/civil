@@ -81,7 +81,7 @@ let userData = localStorage.getItem("userData");
 if (userData) {
 	userData = JSON.parse(userData);
 	setUserProfile(userData);
-	setEmail(userData);
+	setEmail();
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -90,7 +90,7 @@ onAuthStateChanged(auth, async (user) => {
 		if (!userData) {
 			await refreshUserData();
 			setUserProfile(userData);
-			setEmail(userData);
+			setEmail();
 		}
 	}
 });
