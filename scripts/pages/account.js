@@ -68,6 +68,8 @@ reauthenticateForm.addEventListener("submit", reauthenticateUser);
 const reauthModal = document.querySelector("#reauth-modal");
 const reauthenticateMessage = document.querySelector("#reauthenticate-message");
 
+hideMessage(reauthenticateMessage);
+
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * Initialization
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
@@ -94,7 +96,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
-	console.log("REFRESHING USER DATA");
 	axios({
 		method: "get",
 		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
@@ -103,7 +104,7 @@ async function refreshUserData() {
 		},
 	})
 		.then((res) => {
-			console.log("RES: " + res);
+			console.log("USER DATA: " + res);
 			localStorage.setItem("userData", JSON.stringify(res.data));
 			userData = res.data;
 		})
@@ -159,16 +160,13 @@ async function detectChanges(event) {
 	let changed = false;
 
 	Array.from(form.elements).forEach((input) => {
-		console.log(input.value);
 		if (input.type !== "submit") {
 			if (input.value !== userData[input.name]) {
-				console.log("has changed");
 				changed = true;
 			}
 		}
 	});
 
-	console.log("CHANGED: " + changed);
 	if (changed) {
 		enableSubmit(PROFILE_SUBMIT);
 	} else {
@@ -216,7 +214,8 @@ export async function updateSecurity(event) {
 					disableSubmit();
 				})
 				.catch((err) => {
-					console.error(err.code);
+					console.error(err);
+					showMessage(passwordValidationMessage, FormMessageType.Error, err);
 					if (err.code === "auth/requires-recent-login") {
 						formToSubmit = securityForm;
 						show(reauthModal);
@@ -312,7 +311,6 @@ function validatePasswordOnBlur() {
 }
 
 function setEmail() {
-	console.log("SETTING EMAIL FROM AUTH CURRENT USER");
 	EMAIL_FIELD.value = auth.currentUser.email;
 }
 
@@ -409,8 +407,6 @@ async function sendRequest(endpoint, method, data, params) {
 		params,
 	})
 		.then((res) => {
-			console.log(res);
-			console.log(res.data);
 			return res;
 		})
 		.catch((err) => {
