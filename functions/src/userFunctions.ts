@@ -33,7 +33,7 @@ router.get("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	const uid = req.params.uid;
 	const profileData = await getUserData(uid);
 	functions.logger.log(profileData);
-	res.status(200).json(profileData);
+	return res.status(200).json(profileData);
 });
 
 /**
@@ -64,11 +64,11 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 		})
 		.then((result) => {
 			console.log("Success: Updated user information", result);
-			return null;
+			res.status(200).send("Updated profile successfully");
 		})
 		.catch((err) => {
 			console.log("Could not update user's information", err);
-			return null;
+			res.status(400).send("Could not update profile.");
 		});
 });
 

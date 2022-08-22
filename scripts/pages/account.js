@@ -94,8 +94,8 @@ onAuthStateChanged(auth, async (user) => {
 
 async function refreshUserData() {
 	sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
-		localStorage.setItem("userData", JSON.stringify(res.data));
-		userData = res.data;
+		localStorage.setItem("userData", JSON.stringify(res));
+		userData = res;
 	});
 	return userData;
 }
