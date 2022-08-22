@@ -84,10 +84,12 @@ onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		token = await user.getIdToken();
 		if (!userData) {
+			console.log("no user data");
 			await refreshUserData();
 			setUserProfile();
 			setEmail();
 		} else {
+			console.log("user data initialized");
 			setUserProfile();
 			setEmail();
 		}
@@ -95,6 +97,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
+	console.log("REFRESHING USER DATA");
 	axios({
 		method: "get",
 		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
@@ -121,7 +124,8 @@ async function revokeUserData() {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 function setUserProfile() {
-	if (!userData) return console.error("Profile not set.");
+	console.log("SETTING USER PROFILE");
+	if (!userData) return console.log("Profile not set.");
 
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
