@@ -211,7 +211,7 @@ export async function updateSecurity(event) {
 					);
 					NEW_PASSWORD_FIELD.value = "";
 					CONFIRM_PASSWORD_FIELD.value = "";
-					disableSubmit();
+					disableSubmit(SECURITY_SUBMIT);
 				})
 				.catch((err) => {
 					console.error(err);
