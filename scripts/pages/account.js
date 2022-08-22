@@ -95,7 +95,13 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
-	await sendRequest(`/user/profile/${auth.currentUser.uid}`, "get", null, null)
+	await axios({
+		method: "get",
+		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
+		headers: {
+			Authorization: `Bearer ${token}`,
+		},
+	})
 		.then((res) => {
 			console.log("USER DATA: " + res);
 			localStorage.setItem("userData", JSON.stringify(res.data));
@@ -104,21 +110,6 @@ async function refreshUserData() {
 		.catch((err) => {
 			console.error(err);
 		});
-	// await axios({
-	// 	method: "get",
-	// 	url: API_URL + `/user/profile/${auth.currentUser.uid}`,
-	// 	headers: {
-	// 		Authorization: `Bearer ${token}`,
-	// 	},
-	// })
-	// 	.then((res) => {
-	// 		console.log("USER DATA: " + res);
-	// 		localStorage.setItem("userData", JSON.stringify(res.data));
-	// 		userData = res.data;
-	// 	})
-	// 	.catch((err) => {
-	// 		console.error(err);
-	// 	});
 }
 
 async function revokeUserData() {
