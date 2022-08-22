@@ -400,6 +400,8 @@ async function sendRequest(endpoint, method, data, params) {
 		params,
 	})
 		.then((res) => {
+			console.log(res);
+			console.log(res.data);
 			return res;
 		})
 		.catch((err) => {
