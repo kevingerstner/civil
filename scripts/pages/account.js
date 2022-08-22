@@ -358,7 +358,7 @@ activateTab(document.querySelectorAll(".w-tab-link").item(index));
 document.querySelectorAll(".w-tab-link").forEach((tab, index) => {
 	tab.addEventListener("click", (event) => {
 		localStorage.setItem("tab", index);
-		activate(event.currentTarget);
+		activateTab(event.currentTarget);
 	});
 });
 
