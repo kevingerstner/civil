@@ -246,6 +246,7 @@ export async function updateSecurity(event) {
 					);
 					await sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", { email });
 					updated = true;
+					revokeUserData();
 				})
 				.catch((err) => {
 					console.error(err);
