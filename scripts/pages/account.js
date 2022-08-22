@@ -148,15 +148,13 @@ async function detectChanges(event) {
 	let userData = localStorage.getItem("userData");
 	if (!userData) userData = await refreshUserData();
 
-	Array.from(form.elements)
-		.filter((field) => {
-			field.type !== "submit";
-		})
-		.forEach((input) => {
-			console.log(input.value);
-			console.log(userData[input.name]);
+	Array.from(form.elements).forEach((input) => {
+		console.log(input.value);
+		console.log(userData[input.name]);
+		if (input.type !== "submit") {
 			if (input.value !== userData[input.name]) changed = true;
-		});
+		}
+	});
 
 	console.log("CHANGED: " + changed);
 	if (changed) {
