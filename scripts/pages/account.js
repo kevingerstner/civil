@@ -245,8 +245,8 @@ export async function updateSecurity(event) {
 						"Email updated successfully."
 					);
 					await sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", { email });
-					updated = true;
-					revokeUserData();
+					await refreshUserData();
+					disableSubmit(SECURITY_SUBMIT);
 				})
 				.catch((err) => {
 					console.error(err);
@@ -258,12 +258,6 @@ export async function updateSecurity(event) {
 				});
 		}
 	}
-	if (updated) {
-		console.log("REVOKED USER DATA");
-		revokeUserData();
-		disableSubmit(SECURITY_SUBMIT);
-	} else enableSubmit(SECURITY_SUBMIT);
-	return false;
 }
 
 function validateEmailField() {
