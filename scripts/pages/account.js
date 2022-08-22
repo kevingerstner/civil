@@ -86,7 +86,7 @@ onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		token = await user.getIdToken();
 		if (!userData) {
-			userData = await refreshUserData();
+			await refreshUserData();
 			setUserProfile(userData);
 			setEmail(userData);
 		}
@@ -95,11 +95,21 @@ onAuthStateChanged(auth, async (user) => {
 
 async function refreshUserData() {
 	console.log("REFRESHING USER DATA");
-	const res = await sendRequest(`/user/profile/${auth.currentUser.uid}`, "get");
-	console.log("RES: " + res);
-	localStorage.setItem("userData", JSON.stringify(res.data));
-	userData = res.data;
-	return userData;
+	axios({
+		method: "get",
+		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
+		headers: {
+			Authorization: `Bearer ${token}`,
+		},
+	})
+		.then((res) => {
+			console.log("RES: " + res);
+			localStorage.setItem("userData", JSON.stringify(res.data));
+			userData = res.data;
+		})
+		.catch((err) => {
+			console.error(err);
+		});
 }
 
 async function revokeUserData() {
