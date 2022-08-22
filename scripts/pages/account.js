@@ -153,6 +153,8 @@ async function detectChanges(event) {
 			field.type !== "submit";
 		})
 		.forEach((input) => {
+			console.log(input.value);
+			console.log(userData[input.name]);
 			if (input.value !== userData[input.name]) changed = true;
 		});
 
