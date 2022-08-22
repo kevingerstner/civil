@@ -95,21 +95,24 @@ onAuthStateChanged(auth, async (user) => {
 
 async function refreshUserData() {
 	console.log("REFRESHING USER DATA");
-	axios({
-		method: "get",
-		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
-	})
-		.then((res) => {
-			console.log("RES: " + res);
-			localStorage.setItem("userData", JSON.stringify(res.data));
-			userData = res.data;
-		})
-		.catch((err) => {
-			console.error(err);
-		});
+	// axios({
+	// 	method: "get",
+	// 	url: API_URL + `/user/profile/${auth.currentUser.uid}`,
+	// 	headers: {
+	// 		Authorization: `Bearer ${token}`,
+	// 	},
+	// })
+	// 	.then((res) => {
+	// 		console.log("RES: " + res);
+	// 		localStorage.setItem("userData", JSON.stringify(res.data));
+	// 		userData = res.data;
+	// 	})
+	// 	.catch((err) => {
+	// 		console.error(err);
+	// 	});
+	sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
+		console.log("RES: " + res);
+	});
 }
 
 async function revokeUserData() {
@@ -399,7 +402,7 @@ function loadingSubmit(btnElement) {
 }
 
 async function sendRequest(endpoint, method, data, params) {
-	axios({
+	await axios({
 		method,
 		url: API_URL + endpoint,
 		headers: {
