@@ -353,7 +353,7 @@ function activateTab(tab) {
 }
 
 var index = parseInt(localStorage.getItem('tab' || '0'));
-activateTab(document.querySelectorAll(".w-tab-link")[index]);
+activateTab(document.querySelectorAll(".w-tab-link").item(index));
 
 document.querySelectorAll(".w-tab-link").forEach((tab, index) => {
 	tab.addEventListener("click", (event) => {
