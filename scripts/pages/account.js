@@ -345,9 +345,11 @@ async function reauthenticateUser(event) {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 function activateTab(tab) {
-	document.querySelectorAll(".w--current").removeClass("w--current");
+	document.querySelectorAll(".w--current").forEach((tab) => {
+		tab.classList.remove("w--current");
+	});
 	//switch this tab on
-	tab.addClass("w--current");
+	tab.classList.add("w--current");
 }
 
 var index = parseInt(localStorage.getItem('tab' || '0'));
