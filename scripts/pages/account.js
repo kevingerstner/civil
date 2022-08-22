@@ -57,6 +57,8 @@ const LOCATION_FIELD = profileForm.elements["location"];
 
 const profileMessage = document.querySelector("#profile-message");
 
+profileForm.addEventListener("change", detectChanges);
+
 hideMessage(profileMessage);
 disableSubmit(PROFILE_SUBMIT);
 
@@ -138,6 +140,24 @@ async function updateUserProfile(event) {
 			showMessage(profileMessage, FormMessageType.Error, getErrorMessage(err.code));
 			enableSubmit(PROFILE_SUBMIT);
 		});
+}
+
+function detectChanges(form) {
+	let changed = false;
+	let userData = localStorage.getItem(userData);
+	if(!userData) userData = await refreshUserData();
+
+	form.elements.filter((field) => { field.type !== "submit"}).forEach((input) => {
+		if(input.value !== userData[input.name])
+			changed = true;
+	})
+
+	console.log("CHANGED: " + changed);
+	if(changed) {
+		enableSubmit(PROFILE_SUBMIT);
+	} else {
+		disableSubmit(PROFILE_SUBMIT);
+	}
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
