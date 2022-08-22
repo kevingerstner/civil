@@ -17,7 +17,7 @@ const stripe = new Stripe(process.env.STRIPE_KEY!, {
 	apiVersion: "2020-08-27",
 });
 
-const DOMAIN = "https://civilmedia.webflow.io";
+const DOMAIN = "https://civilmedia.io";
 
 /**
  * The Stripe webhook that handles response to checkout events
@@ -141,7 +141,6 @@ async function handleSubscriptionCreated(event) {
 
 async function handleSubscriptionUpdated(event) {
 	const eventData = event.data.object;
-	console.log(eventData);
 	const customerData = await getCustomerData(eventData.customer);
 	const uid = await getUserIDByCustomerID(eventData.customer);
 	if (!uid) {
@@ -161,9 +160,8 @@ async function handleSubscriptionUpdated(event) {
 				})
 			);
 		}
-	}
-	// If cancel_at_period_end is false and active is false, the subscription was previously cancelled
-	else {
+	} else {
+		// If cancel_at_period_end is false and active is false, the subscription was previously cancelled
 		if (customerData && customerData.active === false) {
 			updateCustomer(eventData.customer, { active: true });
 			await slackSubscriptionRenewedNotification(
