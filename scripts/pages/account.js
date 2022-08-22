@@ -352,12 +352,12 @@ function activateTab(tab) {
 	tab.classList.add("w--current");
 }
 
-var index = parseInt(localStorage.getItem('tab' || '0'));
+var index = parseInt(localStorage.getItem("tab" || "0"));
 activateTab(document.querySelectorAll(".w-tab-link").item(index));
 
 document.querySelectorAll(".w-tab-link").forEach((tab, index) => {
 	tab.addEventListener("click", (event) => {
-		localStorage.setItem('tab') = index;
+		localStorage.setItem("tab", index);
 		activate(event.currentTarget);
 	});
 });
