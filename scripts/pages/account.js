@@ -1,9 +1,7 @@
 import {
 	getAuth,
-	updateProfile,
 	updatePassword,
 	reauthenticateWithCredential,
-	sendEmailVerification,
 	EmailAuthProvider,
 	onAuthStateChanged,
 	updateEmail,
@@ -30,16 +28,17 @@ const EMAIL_FIELD = securityForm.elements["email"];
 const SECURITY_SUBMIT = securityForm.querySelector('input[type="submit"]');
 
 const emailValidationMessage = document.querySelector("#email-message");
-const passwordValidationMessage = document.querySelector("#password-validation-message");
+const passwordMessage = document.querySelector("#password-validation-message");
 const confirmPassMessage = document.querySelector("#change-password-message");
 
 NEW_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
 NEW_PASSWORD_FIELD.addEventListener("blur", validatePasswordOnBlur);
 CONFIRM_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
 EMAIL_FIELD.addEventListener("keyup", validateEmailField);
+securityForm.addEventListener("change", detectChanges);
 
 hideMessage(confirmPassMessage);
-hideMessage(passwordValidationMessage);
+hideMessage(passwordMessage);
 hideMessage(emailValidationMessage);
 disableSubmit(SECURITY_SUBMIT);
 
@@ -78,25 +77,25 @@ const auth = getAuth();
 let token;
 
 let userData = localStorage.getItem("userData");
-if (userData) userData = JSON.parse(userData);
-window.onload = () => {
-	setUserProfile(userData);
-	setEmail(userData);
-};
+if (userData) {
+	userData = JSON.parse(userData);
+	setUserProfile();
+	setEmail();
+}
 
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		token = await user.getIdToken();
 		if (!userData) {
 			await refreshUserData();
-			setUserProfile(userData);
-			setEmail(userData);
+			setUserProfile();
+			setEmail();
 		}
 	}
 });
 
 async function refreshUserData() {
-	axios({
+	await axios({
 		method: "get",
 		url: API_URL + `/user/profile/${auth.currentUser.uid}`,
 		headers: {
@@ -104,7 +103,6 @@ async function refreshUserData() {
 		},
 	})
 		.then((res) => {
-			console.log("USER DATA: " + res);
 			localStorage.setItem("userData", JSON.stringify(res.data));
 			userData = res.data;
 		})
@@ -113,15 +111,13 @@ async function refreshUserData() {
 		});
 }
 
-async function revokeUserData() {
-	localStorage.removeItem("userData");
-}
-
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * Edit Profile Tab
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
-function setUserProfile(userData) {
+function setUserProfile() {
+	if (!userData) return console.log("Profile not set.");
+
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
 	LAST_NAME_FIELD.value = userData.lastName;
@@ -161,8 +157,12 @@ async function detectChanges(event) {
 
 	Array.from(form.elements).forEach((input) => {
 		if (input.type !== "submit") {
-			if (input.value !== userData[input.name]) {
-				changed = true;
+			if (userData[input.name]) {
+				if (input.value !== userData[input.name]) {
+					changed = true;
+				}
+			} else {
+				if (input.value !== "") changed = true;
 			}
 		}
 	});
@@ -181,7 +181,7 @@ async function detectChanges(event) {
 let formToSubmit;
 
 /**
- * Change Password
+ * Change Password, Change Email
  * Attempts to change the currently authenticated user's password to a new password.
  * @param {event} event
  */
@@ -189,50 +189,35 @@ export async function updateSecurity(event) {
 	event.preventDefault();
 	event.stopPropagation();
 
-	let updated = false;
-
-	// UI
 	loadingSubmit(SECURITY_SUBMIT);
 
 	if (auth.currentUser) {
-		// Get Form values
 		const newPassword = NEW_PASSWORD_FIELD.value;
 		const email = EMAIL_FIELD.value;
 
+		// UPDATE PASSWORD
 		if (newPassword) {
 			updatePassword(auth.currentUser, newPassword)
 				.then(() => {
-					// Updated Password
-					updated = true;
-					showMessage(
-						passwordValidationMessage,
-						FormMessageType.Success,
-						"Password updated successfully."
-					);
+					showMessage(passwordMessage, FormMessageType.Success, "Password updated successfully.");
 					NEW_PASSWORD_FIELD.value = "";
 					CONFIRM_PASSWORD_FIELD.value = "";
 					disableSubmit(SECURITY_SUBMIT);
 				})
-				.catch((err) => {
-					console.error(err);
-					showMessage(passwordValidationMessage, FormMessageType.Error, err);
-					if (err.code === "auth/requires-recent-login") {
-						formToSubmit = securityForm;
-						show(reauthModal);
-						enableSubmit(SECURITY_SUBMIT);
-					}
-				});
+				.catch((err) => {});
 		}
 
 		if (email && email !== auth.currentUser.email) {
 			updateEmail(auth.currentUser, email)
-				.then(() => {
+				.then(async () => {
 					showMessage(
 						emailValidationMessage,
 						FormMessageType.Success,
 						"Email updated successfully."
 					);
-					updated = true;
+					disableSubmit(SECURITY_SUBMIT);
+					await sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", { email });
+					await refreshUserData();
 				})
 				.catch((err) => {
 					console.error(err);
@@ -244,27 +229,25 @@ export async function updateSecurity(event) {
 				});
 		}
 	}
-	if (updated) {
-		revokeUserData();
-		disableSubmit(SECURITY_SUBMIT);
-	} else enableSubmit(SECURITY_SUBMIT);
-	return false;
 }
 
+/**
+ * Validate Email Field
+ * Makes sure the email field is filled
+ */
 function validateEmailField() {
-	enableSubmit(SECURITY_SUBMIT);
-	const email = EMAIL_FIELD.value;
-	if (!email) {
-		emailValidationMessage.innerHTML = "This field is required!";
-		show(emailValidationMessage);
+	if (!EMAIL_FIELD.value) {
+		showMessage(emailValidationMessage, FormMessageType.Error, "This field is required!");
+		disableSubmit(SECURITY_SUBMIT);
 	} else {
-		emailValidationMessage.innerHTML = "";
-		hide(emailValidationMessage);
+		hideMessage(emailValidationMessage);
+		enableSubmit(SECURITY_SUBMIT);
 	}
 }
 
 /**
- * Function that checks if the newPassword field matches the confirmNewPassword
+ * Check if Confirm Password Matches
+ * Checks if the newPassword field matches the confirmNewPassword
  * and handles UI to show the state.
  */
 function checkIfConfirmPasswordMatches() {
@@ -300,18 +283,14 @@ function checkIfConfirmPasswordMatches() {
 
 function validatePasswordOnBlur() {
 	if (NEW_PASSWORD_FIELD.value.length > 0 && NEW_PASSWORD_FIELD.value.length < 6) {
-		showMessage(
-			passwordValidationMessage,
-			FormMessageType.Error,
-			"Passwords must be at least 6 characters."
-		);
+		showMessage(passwordMessage, FormMessageType.Error, "Passwords must be at least 6 characters.");
 	} else {
-		hideMessage(passwordValidationMessage);
+		hideMessage(passwordMessage);
 	}
 }
 
 function setEmail() {
-	EMAIL_FIELD.value = auth.currentUser.email;
+	EMAIL_FIELD.value = userData.email;
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -338,6 +317,28 @@ async function reauthenticateUser(event) {
 			showMessage(reauthenticateMessage, FormMessageType.Error, getErrorMessage(err.code));
 		});
 }
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * Remember Tab
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
+// Remembers which account tab the app was on last and opens it
+
+function activateTab(tab) {
+	document.querySelectorAll(".w--current").forEach((tab) => {
+		tab.classList.remove("w--current");
+	});
+	tab.classList.add("w--current");
+}
+
+var index = parseInt(localStorage.getItem("tab" || "0"));
+activateTab(document.querySelectorAll(".w-tab-link").item(index));
+
+document.querySelectorAll(".w-tab-link").forEach((tab, index) => {
+	tab.addEventListener("click", (event) => {
+		localStorage.setItem("tab", index);
+		activateTab(event.currentTarget);
+	});
+});
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * Helper Functions
