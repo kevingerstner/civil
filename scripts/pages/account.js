@@ -356,9 +356,9 @@ var index = parseInt(localStorage.getItem('tab' || '0'));
 activateTab(document.querySelectorAll(".w-tab-link")[index]);
 
 document.querySelectorAll(".w-tab-link").forEach((tab, index) => {
-	tab.addEventListener("click", () => {
+	tab.addEventListener("click", (event) => {
 		localStorage.setItem('tab') = index;
-		activate(this);
+		activate(event.currentTarget);
 	});
 });
 
