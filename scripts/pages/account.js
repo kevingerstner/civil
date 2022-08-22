@@ -95,12 +95,11 @@ onAuthStateChanged(auth, async (user) => {
 
 async function refreshUserData() {
 	console.log("REFRESHING USER DATA");
-	sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
-		console.log("RES: " + res);
-		localStorage.setItem("userData", JSON.stringify(res.data));
-		userData = res.data;
-		return userData;
-	});
+	const res = await sendRequest(`/user/profile/${auth.currentUser.uid}`, "get");
+	console.log("RES: " + res);
+	localStorage.setItem("userData", JSON.stringify(res.data));
+	userData = res.data;
+	return userData;
 }
 
 async function revokeUserData() {
