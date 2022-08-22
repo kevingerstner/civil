@@ -95,7 +95,7 @@ onAuthStateChanged(auth, async (user) => {
 
 async function refreshUserData() {
 	console.log("REFRESHING USER DATA");
-	sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
+	await sendRequest(`/user/profile/${auth.currentUser.uid}`, "get").then((res) => {
 		console.log("RES: " + res);
 		localStorage.setItem("userData", JSON.stringify(res.data));
 		userData = res.data;
@@ -137,7 +137,7 @@ async function updateUserProfile(event) {
 		.then(() => {
 			showMessage(profileMessage, FormMessageType.Success, "Profile updated!");
 			disableSubmit(PROFILE_SUBMIT);
-			refreshUserData();
+			await refreshUserData();
 		})
 		.catch((err) => {
 			showMessage(profileMessage, FormMessageType.Error, getErrorMessage(err.code));
