@@ -49,10 +49,10 @@ profileForm.addEventListener("submit", updateUserProfile);
 
 const PROFILE_SUBMIT = profileForm.querySelector('input[type="submit"]');
 
-const FIRST_NAME_FIELD = profileForm.elements["first-name"];
-const LAST_NAME_FIELD = profileForm.elements["last-name"];
-const JOB_TITLE_FIELD = profileForm.elements["job-title"];
-const SCHOOL_NAME_FIELD = profileForm.elements["school-name"];
+const FIRST_NAME_FIELD = profileForm.elements["firstName"];
+const LAST_NAME_FIELD = profileForm.elements["lastName"];
+const JOB_TITLE_FIELD = profileForm.elements["jobTitle"];
+const SCHOOL_NAME_FIELD = profileForm.elements["schoolName"];
 const LOCATION_FIELD = profileForm.elements["location"];
 
 const profileMessage = document.querySelector("#profile-message");
@@ -148,9 +148,11 @@ async function detectChanges(event) {
 
 	Array.from(form.elements).forEach((input) => {
 		console.log(input.value);
-		console.log(userData[input.name]);
 		if (input.type !== "submit") {
-			if (input.value !== userData[input.name]) changed = true;
+			if (input.value !== userData[input.name]) {
+				console.log("has changed");
+				changed = true;
+			}
 		}
 	});
 
