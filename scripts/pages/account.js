@@ -37,6 +37,7 @@ NEW_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
 NEW_PASSWORD_FIELD.addEventListener("blur", validatePasswordOnBlur);
 CONFIRM_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
 EMAIL_FIELD.addEventListener("keyup", validateEmailField);
+securityForm.addEventListener("change", detectChanges);
 
 hideMessage(confirmPassMessage);
 hideMessage(passwordValidationMessage);
@@ -260,14 +261,11 @@ export async function updateSecurity(event) {
 }
 
 function validateEmailField() {
-	enableSubmit(SECURITY_SUBMIT);
 	const email = EMAIL_FIELD.value;
 	if (!email) {
-		emailValidationMessage.innerHTML = "This field is required!";
-		show(emailValidationMessage);
+		showMessage(emailValidationMessage, FormMessageType.Error, "This field is required!");
 	} else {
-		emailValidationMessage.innerHTML = "";
-		hide(emailValidationMessage);
+		hideMessage(emailValidationMessage);
 	}
 }
 
