@@ -144,7 +144,7 @@ async function updateUserProfile(event) {
 
 async function detectChanges(form) {
 	let changed = false;
-	let userData = localStorage.getItem(userData);
+	let userData = localStorage.getItem("userData");
 	if (!userData) userData = await refreshUserData();
 
 	form.elements
