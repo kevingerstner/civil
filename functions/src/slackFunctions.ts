@@ -120,41 +120,13 @@ export async function slackSubscribeNotification(
 		},
 	];
 	const message =
-		`💸 New Subscriber 💸 ${firstName} ${lastName} (${email})` + (schoolName && location)
-			? `from ${schoolName} in ${location}`
-			: "";
-	postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
-}
-
-export async function slackNewUserNotification(email: string | undefined, uid: string) {
-	const blocks = [
-		{
-			type: "header",
-			text: {
-				type: "plain_text",
-				text: "👋 New User",
-			},
-		},
-		{
-			type: "section",
-			fields: [
-				{
-					type: "mrkdwn",
-					text: `*Email:*\n${email}`,
-				},
-				{
-					type: "mrkdwn",
-					text: `*User ID:*\n${uid}`,
-				},
-			],
-		},
-	];
-	const message = `👋 New User ${email} (UID: ${uid}))`;
-
+		`💸 New Subscriber 💸 ${firstName} ${lastName} (${email})` +
+		(schoolName && location ? `from ${schoolName} in ${location}` : "");
 	postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
 }
 
 export async function slackSignupNotification(
+	uid: string,
 	email: string,
 	firstName: string,
 	lastName: string,
@@ -168,7 +140,7 @@ export async function slackSignupNotification(
 			type: "header",
 			text: {
 				type: "plain_text",
-				text: "🥳 New Signup!",
+				text: "👋 New Signup!",
 			},
 		},
 		{
@@ -198,10 +170,37 @@ export async function slackSignupNotification(
 					type: "mrkdwn",
 					text: `*Referral:*\n${referral}`,
 				},
+				{
+					type: "mrkdwn",
+					text: `*User ID:*\n${uid}`,
+				},
 			],
 		},
 	];
 	const message = `New Signup! 🥳 ${firstName} ${lastName} (${email})`;
+	await postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
+}
+
+export async function slackErrorNotification(errorTitle: string, errorMessage: string) {
+	const blocks = [
+		{
+			type: "header",
+			text: {
+				type: "plain_text",
+				text: `⚠️ ${errorTitle}`,
+			},
+		},
+		{
+			type: "section",
+			fields: [
+				{
+					type: "mrkdwn",
+					text: errorMessage,
+				},
+			],
+		},
+	];
+	const message = `⚠️ ${errorTitle}`;
 	await postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
 }
 

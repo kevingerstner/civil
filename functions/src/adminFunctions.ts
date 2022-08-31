@@ -6,6 +6,7 @@ const db = admin.firestore();
 
 import { checkIfAdmin } from "./middleware/authMiddleware";
 import { grantClaim, revokeClaim, getUserData } from "./userFunctions";
+import { logError } from "./util/debug";
 
 router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	const userToGrantAdmin = req.body.email;
@@ -20,7 +21,7 @@ router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	res.status(200).send("Granted admin privilege");
 });
 
-router.post("/revokeAdmin", checkIfAdmin, async (req, res) => {
+router.post("/revokeAdmin", checkIfAdmin, async (req) => {
 	const userToGrantAdmin = req.body.email;
 	const user = await admin.auth().getUserByEmail(userToGrantAdmin);
 
@@ -95,7 +96,7 @@ router.get("/user", checkIfAdmin, async (req, res) => {
  * Create documents for users that signed up with the old flow
  * https://firebase.google.com/docs/auth/admin/manage-users?hl=en#list_all_users
  */
-exports.createUserDocumentIfNotFound = functions.https.onRequest(async (req, res) => {
+exports.createUserDocumentIfNotFound = functions.https.onRequest(async () => {
 	const allUsers = async (nextPageToken?: any) => {
 		admin
 			.auth()
@@ -122,7 +123,7 @@ exports.createUserDocumentIfNotFound = functions.https.onRequest(async (req, res
 				}
 			})
 			.catch((err) => {
-				console.log("Error listing users:", err);
+				logError("(ADMIN)", "Error listing users: " + err);
 			});
 	};
 

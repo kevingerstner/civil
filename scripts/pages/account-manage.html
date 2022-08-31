@@ -1,7 +1,9 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script type="module">
 	import {
 		getAuth,
 		sendEmailVerification,
+		checkActionCode,
 		applyActionCode,
 		verifyPasswordResetCode,
 		signInWithEmailAndPassword,
@@ -17,7 +19,10 @@
 	const passResetUI = document.getElementById("password-reset");
 	const passResetSuccessUI = document.getElementById("password-reset-success-ui");
 	const passResetErrorUI = document.getElementById("password-reset-error-ui");
+
 	const recoverEmailUI = document.getElementById("recover-email-ui");
+	const recoverEmailExpired = document.getElementById("recover-email-expired-ui");
+	const recoveredEmailField = document.getElementById("recovered-email");
 
 	const actionHandlerElements = [
 		emailVerifiedUI,
@@ -26,6 +31,7 @@
 		passResetSuccessUI,
 		passResetErrorUI,
 		recoverEmailUI,
+		recoverEmailExpired,
 	];
 
 	const urlParams = new URLSearchParams(window.location.search);
@@ -219,8 +225,32 @@
 	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
 	function handleRecoverEmail() {
-		console.log("haven't handled recover email yet.");
-		showActionUI(recoverEmailUI);
+		let restoredEmail = null;
+		checkActionCode(auth, actionCode)
+			.then((info) => {
+				restoredEmail = info["data"]["email"];
+				recoveredEmailField.innerHTML = restoredEmail;
+				recoveredEmailField.href = `mailto:${restoredEmail}`;
+
+				let token = auth.currentUser && (await auth.currentUser.getIdToken(true));
+				await axios({
+					method: "POST",
+					url: API_URL + `/user/profile/${auth.currentUser.uid}`,
+					data: {
+						email: restoredEmail
+					},
+					headers: {
+						Authorization: `Bearer ${token}`,
+					}
+				});
+				return applyActionCode(auth, actionCode);
+			})
+			.then(() => {
+				showActionUI(recoverEmailUI);
+			})
+			.catch((error) => {
+				showActionUI(recoverEmailExpired);
+			});
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=

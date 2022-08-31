@@ -1,6 +1,7 @@
 import * as express from "express";
 const router = express.Router();
 import { https } from "firebase-functions";
+import { logError, logMessage } from "./util/debug";
 import * as admin from "firebase-admin";
 import {
 	slackSubscribeNotification,
@@ -17,7 +18,9 @@ const stripe = new Stripe(process.env.STRIPE_KEY!, {
 	apiVersion: "2020-08-27",
 });
 
-const DOMAIN = "https://civilmedia.io";
+const DOMAIN = process.env.FUNCTIONS_EMULATOR
+	? "https://civilmedia.webflow.io"
+	: "https://civilmedia.io";
 
 /**
  * The Stripe webhook that handles response to checkout events
@@ -34,11 +37,11 @@ router.post("/webhook", async (request, response) => {
 			process.env.STRIPE_WEBHOOK_SECRET!
 		);
 	} catch (err: any) {
-		console.log("WEBHOOK SIG VERIFICATION FAILED");
-		return response.status(400).send(`Webhook signature verification failed: ${err.message}`);
+		const message = "Webhook signature verification failed.";
+		await logError("(💲Stripe Error💲)", message);
+		return response.status(400).send(message);
 	}
 	// Handle the event
-	console.log("[STRIPE WEBHOOK]: ", event.type);
 	switch (event.type) {
 		case "checkout.session.completed": {
 			await handleCheckoutComplete(event);
@@ -53,7 +56,7 @@ router.post("/webhook", async (request, response) => {
 			break;
 		}
 		case "customer.subscription.created": {
-			await handleSubscriptionCreated(event);
+			await handleSubscriptionCreated();
 			break;
 		}
 		case "customer.subscription.updated": {
@@ -78,17 +81,73 @@ async function handleCheckoutComplete(event) {
 	const uid = eventData.client_reference_id;
 	const customer = eventData.customer;
 
-	if (uid) {
-		await stripe.customers.update(customer, {
-			metadata: { uid },
-		});
-		// Create a customer document in the database
-		await db.collection("customers").doc(customer).set({ uid, active: true }, { merge: true });
-		notifyClientToRefreshToken(uid); // make the client refresh their token
-		console.log("created a new customer: " + customer + " with uid: " + uid);
-	} else {
-		console.error("Error completing checkout: UID was not received.");
-	}
+	// This is enforced on the frontend, but double check
+	if (!uid) throw await logError("(💲Stripe Checkout Error💲)", "UID not received.");
+
+	// Add the uid to the customer metadata in Stripe
+	const updateCustomer = async () => {
+		try {
+			await stripe.customers.update(customer, {
+				metadata: { uid },
+			});
+		} catch {
+			throw await logError("(💲Stripe Checkout Error💲)", "Could not add UID to metadata");
+		}
+	};
+
+	// Create a customer document in Firestore
+	const createCustomerDocument = async () => {
+		try {
+			await db.collection("customers").doc(customer).set(
+				{
+					uid,
+					active: true,
+					subscription: eventData.subscription,
+					joinDate: FieldValue.serverTimestamp(),
+				},
+				{ merge: true }
+			);
+			logMessage(
+				"(💲 Stripe Checkout 💲)",
+				"Created a new customer: " + customer + " with uid " + uid
+			);
+		} catch {
+			throw await logError("(Firebase)", `Could not create customer ${customer}`);
+		}
+	};
+
+	// Give the user the paid claim
+	const grantUserAccess = async () => {
+		try {
+			await grantClaim(uid, "paid");
+			// Notify the client to refresh the IDToken so the paid claim propogates
+			await notifyClientToRefreshToken(uid);
+			logMessage(
+				"(💲 Stripe Checkout 💲)",
+				"Granted user access: " + customer + " with uid: " + uid
+			);
+		} catch {
+			throw await logError("(User)", "Unable to grant user access");
+		}
+	};
+
+	// Post a notification to Slack
+	const postSlackNotification = async () => {
+		try {
+			const userData = await getUserData(uid);
+			const { email, firstName, lastName, schoolName, location } = userData;
+			await slackSubscribeNotification(email, firstName, lastName, schoolName, location);
+		} catch (error) {
+			throw await logError("(💬 Slack 💬)", "Unable to post Slack Notification");
+		}
+	};
+
+	await Promise.allSettled([
+		updateCustomer(),
+		createCustomerDocument(),
+		grantUserAccess(),
+		postSlackNotification(),
+	]);
 }
 
 /* ------------- CUSTOMERS ------------------ */
@@ -110,33 +169,8 @@ async function handleCustomerDeleted(event) {
 
 /* ------------- SUBSCRIPTION ----------------- */
 
-async function handleSubscriptionCreated(event) {
-	const eventData = event.data.object;
-	if (!eventData.customer) {
-		console.error("(SUBSCRIPTION): The event customer.subscription.created requires a customer ID");
-	}
-
-	await db
-		.collection("customers")
-		.doc(eventData.customer)
-		.update({ active: true, subscription: eventData.id, joinDate: FieldValue.serverTimestamp() });
-
-	const uid = await getUserIDByCustomerID(eventData.customer);
-	// Grant the paid claim for this user
-	if (uid) {
-		await grantClaim(uid, "paid");
-		console.log("(SUBSCRIPTION): Created license and marked paid for " + uid);
-		// Post the notification to Slack
-		const userData = await getUserData(uid);
-		if (userData) {
-			const { email, firstName, lastName, schoolName, location } = userData;
-			slackSubscribeNotification(email, firstName, lastName, schoolName, location);
-		}
-	} else {
-		console.error(
-			"(SUBSCRIPTION): Could not retrieve the UID from this Customer ID: " + eventData.customer
-		);
-	}
+async function handleSubscriptionCreated() {
+	logMessage("(SUBSCRIPTION)", "Subscription created");
 }
 
 async function handleSubscriptionUpdated(event) {
@@ -144,7 +178,10 @@ async function handleSubscriptionUpdated(event) {
 	const customerData = await getCustomerData(eventData.customer);
 	const uid = await getUserIDByCustomerID(eventData.customer);
 	if (!uid) {
-		return console.error("Unable to get User ID for customer " + eventData.customer);
+		return await logError(
+			"(Subscription Updated)",
+			"Unable to get UID for customer" + eventData.customer
+		);
 	}
 	const userData = await getUserData(uid);
 	// If the user canceled their subscription at the end of the current period, send a notification
@@ -171,6 +208,7 @@ async function handleSubscriptionUpdated(event) {
 			);
 		}
 	}
+	return;
 }
 
 async function handleSubscriptionDeleted(event) {
@@ -182,14 +220,14 @@ async function handleSubscriptionDeleted(event) {
 		await revokeClaim(uid, "paid"); // revoke the paid claim
 		notifyClientToRefreshToken(uid); // set the user's token expiration to now so it refreshes
 	} else {
-		console.error("[ERROR] Unable to find uid associated with " + eventData.customer);
+		logError("(Subscription Deleted)", "Unable to find uid associated with " + eventData.customer);
 	}
 	// Update the customer document with no access and clear the expiration date
 	await db
 		.collection("customers")
 		.doc(eventData.customer)
 		.update({ active: false, subscription: null });
-	console.log("revoked license for " + eventData.customer);
+	await logMessage("(Subscription Deleted)", "Revoked License for " + eventData.customer);
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
@@ -197,12 +235,12 @@ async function handleSubscriptionDeleted(event) {
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
 
 router.post("/checkout", async (request, response) => {
-	console.log("CHECKOUT API");
 	try {
-		if (!request.body.uid) throw new Error("Invalid request. UID not included in the request body");
-		if (!request.body.email) {
-			throw new Error("Invalid request. Email not included in the request body");
+		if (!request.body.uid) {
+			throw await logError("(🛒Checkout)", "UID Not included in request body.");
 		}
+		await logMessage("(🛒Checkout)", `User ${request.body.uid} created a checkout session`);
+
 		const session = await stripe.checkout.sessions.create({
 			client_reference_id: request.body.uid,
 			customer_email: request.body.email,
@@ -216,34 +254,12 @@ router.post("/checkout", async (request, response) => {
 		});
 		response.status(200).json({ url: session.url });
 	} catch (err: any) {
-		response
-			.status(400)
-			.send("An error occurred while creating the Checkout Session: " + err.message);
-	}
-});
-
-// I think this is currently unused since subscription management is done through the Stripe Customer Portal
-router.post("/cancel-subscription", checkIfAuthenticated, async (req, res) => {
-	const uid = req["currentUser"];
-	console.log("UID: " + uid);
-	const customerID = await getCustomerIDbyUserID(uid);
-	console.log("CID: " + customerID);
-
-	if (customerID) {
-		const subscription = await stripe.subscriptions.list({
-			customer: customerID,
-			limit: 1,
-		});
-		stripe.subscriptions.update(subscription.data[0].id, {
-			trial_end: "now",
-		});
-		res.status(200).send("Subscription successfully canceled for " + req.body.email);
-	}
-	res
-		.status(400)
-		.send(
-			"Unable to cancel subscription. Please contact team@civilmedia.io if you continue encountering this issue."
+		await logError(
+			"(🛒Checkout)",
+			"An error occurred creating the checkout session: " + err.message
 		);
+		response.status(400).send(err.message);
+	}
 });
 
 /**
@@ -260,7 +276,10 @@ router.post("/create-customer-portal-session", checkIfAuthenticated, async (req,
 			});
 			res.status(200).json({ url: portalSession.url });
 		} catch (error) {
-			console.log(error);
+			await logError(
+				"(Customer Portal)",
+				"An error occurred creating a customer portal for: " + error
+			);
 			res.status(400).send(error);
 		}
 	}

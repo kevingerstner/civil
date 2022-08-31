@@ -1,12 +1,13 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { slackNewUserNotification, slackSignupNotification } from "./slackFunctions";
+import { slackSignupNotification } from "./slackFunctions";
 
 import express from "express";
 const router = express.Router();
 const db = admin.firestore();
 
 import { checkIfAuthenticated } from "./middleware/authMiddleware";
+import { logError } from "./util/debug";
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  CREATE
@@ -17,12 +18,21 @@ exports.sendUserDataToSlack = functions.firestore
 	.onCreate(async (snapshot, context) => {
 		const { email, firstName, lastName, jobTitle, schoolName, location, referral } =
 			snapshot.data();
-		slackSignupNotification(email, firstName, lastName, jobTitle, schoolName, location, referral);
+		const uid = context.auth?.uid;
+		slackSignupNotification(
+			uid || "",
+			email,
+			firstName,
+			lastName,
+			jobTitle,
+			schoolName,
+			location,
+			referral
+		);
 	});
 
 exports.handleNewUser = functions.auth.user().onCreate(async (user) => {
-	functions.logger.warn("Posting Signup to Slack");
-	slackNewUserNotification(user.email, user.uid);
+	functions.logger.debug("New user: " + user.uid);
 });
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
@@ -63,12 +73,11 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	db.collection("users")
 		.doc(uid)
 		.update(data)
-		.then((result) => {
-			console.log("Success: Updated user information", result);
+		.then(() => {
 			res.status(200).send("Updated profile successfully");
 		})
 		.catch((err) => {
-			console.log("Could not update user's information", err);
+			logError("(User)", "Could not update user's information" + err);
 			res.status(400).send("Could not update profile.");
 		});
 });
