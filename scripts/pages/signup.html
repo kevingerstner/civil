@@ -15,10 +15,6 @@
 	const auth = getAuth();
 	const db = getFirestore();
 
-	// URL
-	const LOGIN_URL = "/welcome/login";
-	const VERIFY_URL = "/welcome/verify";
-
 	// Initialize Signup Form Submit Listener
 	const SIGNUP_FORM_EL = document.getElementById("signup-form");
 	SIGNUP_FORM_EL.addEventListener("submit", submitSignupRequest, true);

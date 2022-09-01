@@ -382,19 +382,19 @@ function hideMessage(element) {
 function enableSubmit(btnElement) {
 	btnElement.value = "Save Changes";
 	btnElement.disabled = false;
-	btnElement.classList.remove("disabled");
+	btnElement.classList.remove("btn-disabled");
 }
 
 function disableSubmit(btnElement) {
 	btnElement.value = "Saved";
 	btnElement.disabled = true;
-	btnElement.classList.add("disabled");
+	btnElement.classList.add("btn-disabled");
 }
 
 function loadingSubmit(btnElement) {
 	btnElement.value = "Saving...";
 	btnElement.disabled = true;
-	btnElement.classList.add("disabled");
+	btnElement.classList.add("btn-disabled");
 }
 
 async function sendRequest(endpoint, method, data, params) {

@@ -1,0 +1,104 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script type="module">
+	import {
+		getAuth,
+		createUserWithEmailAndPassword,
+		updateProfile,
+		onAuthStateChanged,
+		connectAuthEmulator,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+	import {
+		getFirestore,
+		setDoc,
+		doc,
+		connectFirestoreEmulator,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
+
+	// AUTH
+	const auth = getAuth();
+	connectAuthEmulator(auth, "http://localhost:9099");
+	const db = getFirestore();
+	connectFirestoreEmulator(db, "localhost", 8080);
+
+	const FormMessageType = {
+		Success: "Success",
+		Notify: "Notify",
+		Error: "Error",
+	};
+
+	// Initialize Signup Form Submit Listener
+	const SIGNUP_FORM_EL = document.getElementById("signup-form");
+	SIGNUP_FORM_EL.addEventListener("submit", submitSignupRequest, true);
+
+	const SIGNUP_BTN_EL = SIGNUP_FORM_EL.querySelector('input[type="submit"]');
+
+	// Initialize Error Message
+	const ERROR_MESSAGE_EL = document.querySelector("#signup-error-message");
+	hide(ERROR_MESSAGE_EL);
+
+	// Search Params
+	const params = new URLSearchParams(window.location.search);
+	const continueURL = params.get("continueURL");
+
+	/**
+	 * Submit a Signup Request. This is a multi-step process:
+	 * 1. Attempts to create an account in Firebase
+	 * 2. If successful, an account + profile is created
+	 * 3. A notification is posted to the Slack channel
+	 * 4. A verification email is sent to the submitted email
+	 * 5. The user is redirected to an email verification screen
+	 */
+	async function submitSignupRequest(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		// Disable UI
+		SIGNUP_BTN_EL.classList.add("btn-disabled");
+		hideMessage(ERROR_MESSAGE_EL);
+
+		// Get Form Elements
+		const formData = {
+			firstName: SIGNUP_FORM_EL["first-name"].value,
+			lastName: SIGNUP_FORM_EL["last-name"].value,
+			email: SIGNUP_FORM_EL["email"].value,
+			grade: SIGNUP_FORM_EL["grade"].value,
+			graduateYear: SIGNUP_FORM_EL["graduate-year"].value,
+		};
+
+		await axios({
+			method: "get",
+			url: "https://localhost:5001/civil-ed/us-central1/api" + "/user/checkIfApproved",
+			data: {
+				email,
+			},
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+		})
+			.then((res) => {
+				console.log("Approved.");
+			})
+			.catch((err) => {
+				console.error("Rejected.");
+			});
+	}
+
+	function showMessage(element, messageType, message) {
+		element.classList.remove("success", "error");
+		switch (messageType) {
+			case FormMessageType.Error:
+				element.classList.add("error");
+				break;
+			case FormMessageType.Success:
+				element.classList.add("success");
+				break;
+		}
+		element.innerHTML = message;
+		show(element);
+	}
+
+	function hideMessage(element) {
+		hide(element);
+		element.innerHTML = "";
+	}
+</script>

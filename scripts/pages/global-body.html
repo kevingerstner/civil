@@ -3,6 +3,8 @@
 ----------------------------------------->
 <script>
 	const API_URL = "https://us-central1-civil-ed.cloudfunctions.net/api";
+	const LOGIN_URL = "/welcome/login";
+	const VERIFY_URL = "/welcome/verify";
 
 	function hide(element) {
 		if (element) element.style.display = "none";
@@ -60,7 +62,8 @@
 					const refreshTime = metadata.data().refreshTime;
 					if (refreshTime && refreshTime < new Date()) {
 						user.getIdToken(true); // refresh the token
-						await updateDoc(metadataRef, { refreshTime: deleteField() });
+						await updateDoc(metadataRef, { refreshTime: deleteField() }); // clear this metadata
+						localStorage.removeItem("userData"); // clear user data
 					}
 				}
 			} catch (error) {

@@ -13,6 +13,30 @@ import { logError } from "./util/debug";
  *  CREATE
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
+router.get("/checkIfApproved", checkIfAuthenticated, async (req, res) => {
+	const email: string = req.body.email;
+	if (!email) return res.status(400).send("No email included in request body.");
+	const domain = email.split("@").pop();
+	if (!domain) return res.status(400).send("This email domain is invalid.");
+
+	await db
+		.collection("domains")
+		.where("name", "==", domain)
+		.get()
+		.then((domainRes) => {
+			if (domainRes.empty) return res.status(400).send("This domain is not approved.");
+			else return res.status(200).send("This domain is approved.");
+		});
+	return res.status(400);
+});
+
+router.post("/create/student/:uid", checkIfAuthenticated, async (req, res) => {
+	const { email, firstName, lastName, grade, graduateYear } = req.body;
+	const uid = req.params.uid;
+
+	await db.collection("users").doc(uid).set({ email, firstName, lastName, grade, graduateYear });
+});
+
 exports.sendUserDataToSlack = functions.firestore
 	.document("users/{userId}")
 	.onCreate(async (snapshot, context) => {
@@ -73,7 +97,8 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	db.collection("users")
 		.doc(uid)
 		.update(data)
-		.then(() => {
+		.then(async () => {
+			await notifyClientToRefreshToken(uid);
 			res.status(200).send("Updated profile successfully");
 		})
 		.catch((err) => {

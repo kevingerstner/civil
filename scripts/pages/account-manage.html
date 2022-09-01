@@ -2,6 +2,7 @@
 <script type="module">
 	import {
 		getAuth,
+		onAuthStateChanged,
 		sendEmailVerification,
 		checkActionCode,
 		applyActionCode,
@@ -9,29 +10,37 @@
 		signInWithEmailAndPassword,
 		sendPasswordResetEmail,
 		confirmPasswordReset,
+		updateEmail,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
 	const auth = getAuth();
 
 	// UI
+	const linkExpiredUI = document.querySelector("#link-expired-ui");
+	const retryBtn = document.querySelector("#retry-btn");
+	retryBtn.addEventListener("click", retryAction);
+	const retryMessage = document.getElementById("retry-message");
+	const retry_email = document.querySelector("#retry-email");
+
+	const linkInvalidUI = document.querySelector("#link-invalid-ui");
+
 	const emailVerifiedUI = document.getElementById("email-verified");
 	const emailVerifiedError = document.getElementById("email-verified-error");
+	const continueBtn = document.querySelector("#email-verified-continue");
+
 	const passResetUI = document.getElementById("password-reset");
 	const passResetSuccessUI = document.getElementById("password-reset-success-ui");
-	const passResetErrorUI = document.getElementById("password-reset-error-ui");
 
 	const recoverEmailUI = document.getElementById("recover-email-ui");
-	const recoverEmailExpired = document.getElementById("recover-email-expired-ui");
 	const recoveredEmailField = document.getElementById("recovered-email");
 
 	const actionHandlerElements = [
 		emailVerifiedUI,
-		emailVerifiedError,
 		passResetUI,
 		passResetSuccessUI,
-		passResetErrorUI,
 		recoverEmailUI,
-		recoverEmailExpired,
+		linkExpiredUI,
+		linkInvalidUI,
 	];
 
 	const urlParams = new URLSearchParams(window.location.search);
@@ -54,38 +63,40 @@
 			handleVerifyEmail();
 			break;
 		default:
-			handleNoMode();
-	}
-
-	function handleNoMode() {
-		window.location.replace("/");
+			showActionUI(linkInvalidUI);
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 	 *  EMAIL VERIFICATION
 	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
-	// Elements
-	const resendVerificationBtn = document.querySelector("#send-verification-btn");
-	const continueBtn = document.querySelector("#email-verified-continue");
-
 	function handleVerifyEmail() {
 		applyActionCode(auth, actionCode)
-			.then((resp) => {
+			.then(() => {
 				// Email address has been verified.
 				showActionUI(emailVerifiedUI);
 				if (continueUrl) continueBtn.href = continueUrl;
 			})
-			.catch((error) => {
-				console.log("Error verifying email" + error.message);
-				showActionUI(emailVerifiedError);
-				resendVerificationBtn.addEventListener("click", resendVerificationEmail);
+			.catch(() => {
+				showActionUI(linkExpiredUI);
 			});
 	}
 
-	function resendVerificationEmail() {
-		if (auth.currentUser) sendEmailVerification(auth.currentUser);
-		else redirectToLogin();
+	// Retry sending the email
+	function retryEmailVerification() {
+		disableBtn(retryBtn);
+		hide(retryMessage);
+
+		sendEmailVerification(auth.currentUser)
+			.then(() => {
+				retryBtn.value = "Sent!";
+			})
+			.catch((error) => {
+				console.log(error);
+				enableBtn(retryBtn);
+				retryMessage.innerText = getErrorMessage(error);
+				show(retryMessage);
+			});
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
@@ -93,18 +104,15 @@
 	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 	// Elements
 	const passwordReset_form = document.getElementById("password-reset-form");
-	const newPassword_field = document.getElementById("new-password");
-	const newPassword_message = document.getElementById("new-password-message");
-	const confirm_field = document.getElementById("confirm-password");
-	const confirm_message = document.getElementById("confirm-password-message");
+	const newPass = document.getElementById("new-password");
+	const newPass_message = document.getElementById("new-password-message");
+	const confirmPass = document.getElementById("confirm-password");
+	const confirmPass_message = document.getElementById("confirm-password-message");
 	const submitButton = document.getElementById("password-reset-submit");
 
-	hide(newPassword_message);
-	hide(confirm_message);
-
 	// Event Listeners
-	newPassword_field.addEventListener("focusout", validatePasswordFields);
-	confirm_field.addEventListener("focusout", validatePasswordFields);
+	newPass.addEventListener("focusout", validatePasswordFields);
+	confirmPass.addEventListener("focusout", validatePasswordFields);
 	document.querySelectorAll(".password-visibility").forEach((element) => {
 		element.addEventListener("click", togglePasswordVisibility);
 	});
@@ -119,8 +127,7 @@
 			})
 			.catch((error) => {
 				// Invalid or expired action code. Ask user to try to reset the password again
-				console.log(error.message);
-				showActionUI(passResetErrorUI);
+				showActionUI(linkExpiredUI);
 			});
 	}
 
@@ -129,42 +136,36 @@
 		event.preventDefault();
 		event.stopPropagation();
 
-		const newPassword = newPassword_field.value;
-
-		confirmPasswordReset(auth, actionCode, newPassword)
-			.then((resp) => {
+		confirmPasswordReset(auth, actionCode, newPass.value)
+			.then(() => {
 				showActionUI(passResetSuccessUI);
 			})
-			.catch((error) => {
+			.catch(() => {
 				showActionUI(passResetErrorUI);
 			});
 	}
 
 	// New Password Field
 	function validatePasswordFields() {
-		const new_value = newPassword_field.value;
-		const confirm_value = confirm_field.value;
-
-		if (new_value.length < 6 && new_value.length > 0) {
-			newPassword_message.innerText = "Passwords must be longer than 6 characters";
-			show(newPassword_message);
+		if (newPass.value.length < 6 && newPass.value.length > 0) {
+			newPass_message.innerText = "Passwords must be longer than 6 characters";
+			show(newPass_message);
 		} else {
-			newPassword_message.innerText = "";
-			hide(newPassword_message);
+			newPass_message.innerText = "";
+			hide(newPass_message);
 		}
 
-		if (new_value !== confirm_value && confirm_value !== "") {
-			confirm_message.innerText = "Confirm Password must match";
-			show(confirm_message);
+		if (newPass.value !== confirmPass.value && confirmPass.value !== "") {
+			confirmPass_message.innerText = "Confirm Password must match";
+			show(confirmPass_message);
 		} else {
-			confirm_message.innerText = "";
-			hide(confirm_message);
+			confirmPass_message.innerText = "";
+			hide(confirmPass_message);
 		}
 	}
 
 	// Password Visibility Toggle
 	function togglePasswordVisibility() {
-		console.log("ACTION TRIGGER");
 		const toggleOn = this.querySelector(".toggle-on");
 		const toggleOff = this.querySelector(".toggle-off");
 		const field = findSiblingWithClass(this, "form_field");
@@ -182,7 +183,7 @@
 
 	// Submit Button
 	function validateSubmitButton() {
-		if (newPassword_field.value === confirm_field.value && newPassword_field.value.length >= 6) {
+		if (newPass.value === confirmPass.value && newPass.value.length >= 6) {
 			submitButton.classList.remove("btn-disabled");
 			submitButton.disabled = false;
 		} else {
@@ -191,32 +192,20 @@
 		}
 	}
 
-	// Send Password Reset Email
-	const successMessage = document.getElementById("password-sent");
-	const sendButton = document.getElementById("password-reset-btn");
-	const resubmitForm = document.getElementById("password-reset-resubmit");
-	const resubmit_email_field = document.getElementById("password-reset-email");
-	const passwordResetMessage = document.getElementById("password-reset-message");
+	// Retry Password Reset Email
+	function retryPasswordReset() {
+		disableBtn(retryBtn);
+		hide(retryMessage);
 
-	hide(successMessage);
-	resubmitForm.addEventListener("submit", resendPasswordReset, true);
-
-	function resendPasswordReset(event) {
-		event.preventDefault();
-		event.stopPropagation();
-
-		sendButton.classList.add("btn-disabled");
-		sendButton.disabled = true;
-
-		sendPasswordResetEmail(auth, resubmit_email_field.value)
+		sendPasswordResetEmail(auth, retry_email.value)
 			.then(() => {
-				show(successMessage);
+				retryBtn.value = "Sent!";
 			})
 			.catch((error) => {
-				sendButton.classList.remove("btn-disabled");
-				sendButton.disabled = false;
-				passwordResetMessage.innerText = error.message;
-				hide(successMessage);
+				console.log(error);
+				enableBtn(retryBtn);
+				retryMessage.innerText = getErrorMessage(error);
+				show(retryMessage);
 			});
 	}
 
@@ -227,7 +216,7 @@
 	function handleRecoverEmail() {
 		let restoredEmail = null;
 		checkActionCode(auth, actionCode)
-			.then((info) => {
+			.then(async (info) => {
 				restoredEmail = info["data"]["email"];
 				recoveredEmailField.innerHTML = restoredEmail;
 				recoveredEmailField.href = `mailto:${restoredEmail}`;
@@ -237,11 +226,11 @@
 					method: "POST",
 					url: API_URL + `/user/profile/${auth.currentUser.uid}`,
 					data: {
-						email: restoredEmail
+						email: restoredEmail,
 					},
 					headers: {
 						Authorization: `Bearer ${token}`,
-					}
+					},
 				});
 				return applyActionCode(auth, actionCode);
 			})
@@ -249,16 +238,48 @@
 				showActionUI(recoverEmailUI);
 			})
 			.catch((error) => {
-				showActionUI(recoverEmailExpired);
+				console.error(error);
+				showActionUI(linkInvalidUI);
 			});
+	}
+
+	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+	 *  RESEND EMAIL
+	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+
+	function retryAction(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		switch (mode) {
+			case "resetPassword":
+				retryPasswordReset();
+				break;
+			case "recoverEmail":
+				break;
+			case "verifyEmail":
+				retryEmailVerification();
+				break;
+			default:
+				handleNoMode();
+		}
 	}
 
 	/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 	 *  HELPER FUNCTIONS
 	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
-	function redirectToLogin() {
-		window.location.replace(window.location.origin + "/login");
+	function getErrorMessage(error) {
+		switch (error.code) {
+			case "auth/missing-email":
+				return "This field is required.";
+				break;
+			case "auth/user-not-found":
+				return "No account is associated with that email.";
+				break;
+			default:
+				return "An error occurred.";
+		}
 	}
 
 	function findSiblingWithClass(element, className) {
@@ -278,13 +299,17 @@
 		}
 	}
 
-	function show(element) {
-		element.style.display = "block";
-	}
-	function hide(element) {
-		element.style.display = "none";
-	}
 	function isHidden(element) {
 		return window.getComputedStyle(element).display === "none";
+	}
+
+	function disableBtn(element) {
+		element.classList.add("btn-disabled");
+		element.disabled = true;
+	}
+
+	function enableBtn(element) {
+		element.classList.remove("btn-disabled");
+		element.disabled = false;
 	}
 </script>
