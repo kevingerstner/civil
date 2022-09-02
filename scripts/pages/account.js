@@ -84,11 +84,11 @@ if (userData) {
 
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
+		EMAIL_FIELD.value = user.email;
 		token = await user.getIdToken();
 		if (!userData) {
 			await refreshUserData();
 			setUserProfile();
-			EMAIL_FIELD.value = user.email;
 		}
 	}
 });
