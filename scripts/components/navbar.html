@@ -51,6 +51,11 @@
 		signOut(auth)
 			.then(() => {
 				localStorage.removeItem("uid");
+				localStorage.removeItem("email");
+				localStorage.removeItem("userData");
+				localStorage.removeItem("tab");
+				localStorage.removeItem("name");
+				localStorage.removeItem("paid");
 				location.reload();
 			})
 			.catch((error) => console.log(error));

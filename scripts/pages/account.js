@@ -80,7 +80,6 @@ let userData = localStorage.getItem("userData");
 if (userData) {
 	userData = JSON.parse(userData);
 	setUserProfile();
-	setEmail();
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -89,7 +88,7 @@ onAuthStateChanged(auth, async (user) => {
 		if (!userData) {
 			await refreshUserData();
 			setUserProfile();
-			setEmail();
+			EMAIL_FIELD.value = user.email;
 		}
 	}
 });
@@ -287,10 +286,6 @@ function validatePasswordOnBlur() {
 	} else {
 		hideMessage(passwordMessage);
 	}
-}
-
-function setEmail() {
-	EMAIL_FIELD.value = userData.email;
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+

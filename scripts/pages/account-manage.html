@@ -15,7 +15,13 @@
 
 	const auth = getAuth();
 
+	// PROBLEM: The page seems to reload after the email is recovered, resetting the actionCompleted.
+	// SOLUTION? : Create a separate page that shows the success screen
+
 	// UI
+	const loader = document.querySelector(".loader");
+	show(loader);
+
 	const linkExpiredUI = document.querySelector("#link-expired-ui");
 	const retryBtn = document.querySelector("#retry-btn");
 	retryBtn.addEventListener("click", retryAction);
@@ -52,15 +58,16 @@
 	// (Optional) Get the language code if available.
 	const lang = urlParams.has("lang") ? urlParams.get("lang") : "en";
 
+	// Determine which action to perform based on the mode
 	switch (mode) {
+		case "verifyEmail":
+			handleVerifyEmail();
+			break;
 		case "resetPassword":
 			handleResetPassword();
 			break;
 		case "recoverEmail":
 			handleRecoverEmail();
-			break;
-		case "verifyEmail":
-			handleVerifyEmail();
 			break;
 		default:
 			showActionUI(linkInvalidUI);
@@ -214,27 +221,21 @@
 	 * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
 	function handleRecoverEmail() {
+		console.log("Recovering email");
 		let restoredEmail = null;
+		// Confirm the action code is valid
 		checkActionCode(auth, actionCode)
 			.then(async (info) => {
+				// Get the restored email address
 				restoredEmail = info["data"]["email"];
 				recoveredEmailField.innerHTML = restoredEmail;
 				recoveredEmailField.href = `mailto:${restoredEmail}`;
-
+				// Refresh the token
 				let token = auth.currentUser && (await auth.currentUser.getIdToken(true));
-				await axios({
-					method: "POST",
-					url: API_URL + `/user/profile/${auth.currentUser.uid}`,
-					data: {
-						email: restoredEmail,
-					},
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				});
+				// Revert to the old email
 				return applyActionCode(auth, actionCode);
 			})
-			.then(() => {
+			.then(async () => {
 				showActionUI(recoverEmailUI);
 			})
 			.catch((error) => {
@@ -292,11 +293,13 @@
 
 	// Removes all other action handlers from the DOM
 	function showActionUI(actionUI) {
+		show(loader);
 		for (var i = 0; i < actionHandlerElements.length; i++) {
 			if (actionHandlerElements[i] === actionUI) {
 				show(actionHandlerElements[i]);
 			} else hide(actionHandlerElements[i]);
 		}
+		hide(loader);
 	}
 
 	function isHidden(element) {
