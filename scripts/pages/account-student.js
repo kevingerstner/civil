@@ -340,7 +340,7 @@ function loadingSubmit(btnElement) {
 }
 
 async function sendRequest(method, endpoint, data, params) {
-	await axios({
+	const res = await axios({
 		method,
 		//url: API_URL + endpoint,
 		url: "http://localhost:5001/civil-ed/us-central1/api" + endpoint,
@@ -349,14 +349,10 @@ async function sendRequest(method, endpoint, data, params) {
 		},
 		data,
 		params,
-	})
-		.then((res) => {
-			console.log("REQUEST FINISHED WE IN THEN");
-			console.log(res);
-			return res;
-		})
-		.catch((err) => {
-			console.error(err);
-		});
+	}).catch((err) => {
+		console.error(err);
+		return err;
+	});
 	console.log("SENDREQUEST END OF FUNCTION");
+	return res;
 }
