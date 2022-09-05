@@ -114,7 +114,7 @@ async function updateUserProfile(event) {
 	loadingSubmit(PROFILE_SUBMIT);
 	hideMessage(profileMessage);
 
-	sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", {
+	sendRequest("post", `/user/profile/${auth.currentUser.uid}`, {
 		firstName: FIRST_NAME_FIELD.value,
 		lastName: LAST_NAME_FIELD.value,
 		grade: GRADE_FIELD.value,
@@ -335,7 +335,7 @@ function loadingSubmit(btnElement) {
 	btnElement.classList.add("btn-disabled");
 }
 
-async function sendRequest(endpoint, method, data, params) {
+async function sendRequest(method, endpoint, data, params) {
 	await axios({
 		method,
 		//url: API_URL + endpoint,
