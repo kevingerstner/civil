@@ -18,6 +18,7 @@
 	import {
 		getAuth,
 		onAuthStateChanged,
+		connectAuthEmulator,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 	import {
 		getFirestore,
@@ -25,6 +26,7 @@
 		updateDoc,
 		deleteField,
 		doc,
+		connectFirestoreEmulator,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
 
 	const ACCESS_DENIED_URL = "/pay/pricing";
@@ -32,6 +34,7 @@
 	const privatePages = ["/current-events/", "/units/"];
 	// pages that are accessible to any authenticated user
 	const authenticatedPages = ["/account/profile"];
+	const testingPages = ["/account/student"];
 	const allowList = [
 		"/current-events/electoral-college-vs-popular-vote",
 		"/units/unit-1-foundations-of-american-democracy",
@@ -44,6 +47,12 @@
 
 	const auth = getAuth();
 	const db = getFirestore();
+
+	// If this route is testing, connect the auth emulators
+	if (isRouteTesting()) {
+		connectAuthEmulator(auth, "http://localhost:9099");
+		connectFirestoreEmulator(db, "localhost", 8080);
+	}
 
 	let metadataRef = null;
 	onAuthStateChanged(auth, async (user) => {
@@ -102,6 +111,13 @@
 	function isRouteAuthenticated() {
 		for (var i = 0; i < authenticatedPages.length; i++) {
 			if (window.location.pathname.startsWith(authenticatedPages[i])) return true;
+		}
+		return false;
+	}
+
+	function isRouteTesting() {
+		for (var i = 0; i < testingPages.length; i++) {
+			if (window.location.pathname.startsWith(testingPages[i])) return true;
 		}
 		return false;
 	}

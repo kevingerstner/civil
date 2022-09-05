@@ -77,6 +77,8 @@ onAuthStateChanged(auth, async (user) => {
 			await refreshUserData();
 			setUserProfile();
 		}
+	} else {
+		window.location.href = "/welcome/login-testing";
 	}
 });
 
