@@ -11,7 +11,7 @@ import {
 import { FieldValue } from "firebase-admin/firestore";
 const db = admin.firestore();
 import { checkIfAuthenticated } from "./middleware/authMiddleware";
-import { grantClaim, revokeClaim, notifyClientToRefreshToken, getUserData } from "./userFunctions";
+import { grantClaims, revokeClaim, notifyClientToRefreshToken, getUserData } from "./userFunctions";
 
 import Stripe from "stripe";
 const stripe = new Stripe(process.env.STRIPE_KEY!, {
@@ -119,7 +119,7 @@ async function handleCheckoutComplete(event) {
 	// Give the user the paid claim
 	const grantUserAccess = async () => {
 		try {
-			await grantClaim(uid, "paid");
+			await grantClaims(uid, ["paid"]);
 			// Notify the client to refresh the IDToken so the paid claim propogates
 			await notifyClientToRefreshToken(uid);
 			logMessage(

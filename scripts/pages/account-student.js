@@ -19,28 +19,28 @@ document.querySelectorAll(".w-form").forEach((element) => {
 
 // PASSWORD & SECURITY TAB
 const SECURITY_FORM = document.querySelector("#security-form");
+const EMAIL_FIELD = SECURITY_FORM.elements["email"];
 const NEW_PASSWORD_FIELD = SECURITY_FORM.elements["new-password"];
 const CONFIRM_PASSWORD_FIELD = SECURITY_FORM.elements["confirm-password"];
-const EMAIL_FIELD = SECURITY_FORM.elements["email"];
 const SECURITY_SUBMIT = SECURITY_FORM.querySelector('input[type="submit"]');
 const EMAIL_MESSAGE = document.querySelector("#email-message");
 const PASSWORD_MESSAGE = document.querySelector("#password-validation-message");
 const CONFIRM_PASS_MESSAGE = document.querySelector("#change-password-message");
 
+EMAIL_FIELD.setAttribute("readonly", ""); // prevent email from being edited
+
 SECURITY_FORM.addEventListener("submit", updateSecurity);
 NEW_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
 NEW_PASSWORD_FIELD.addEventListener("blur", validatePasswordOnBlur);
 CONFIRM_PASSWORD_FIELD.addEventListener("keyup", checkIfConfirmPasswordMatches);
-EMAIL_FIELD.addEventListener("keyup", validateEmailField);
 SECURITY_FORM.addEventListener("change", detectChanges);
 
 // PROFILE FORM
 const PROFILE_FORM = document.querySelector("#profile-form");
 const FIRST_NAME_FIELD = PROFILE_FORM.elements["firstName"];
 const LAST_NAME_FIELD = PROFILE_FORM.elements["lastName"];
-const JOB_TITLE_FIELD = PROFILE_FORM.elements["jobTitle"];
-const SCHOOL_NAME_FIELD = PROFILE_FORM.elements["schoolName"];
-const LOCATION_FIELD = PROFILE_FORM.elements["location"];
+const GRADE_FIELD = PROFILE_FORM.elements["grade"];
+const GRAD_YEAR_FIELD = PROFILE_FORM.elements["graduate-year"];
 const PROFILE_SUBMIT = PROFILE_FORM.querySelector('input[type="submit"]');
 const profileMessage = document.querySelector("#profile-message");
 
@@ -99,9 +99,8 @@ function setUserProfile() {
 	document.querySelector(".profile_name").innerText = userData.firstName + " " + userData.lastName;
 	FIRST_NAME_FIELD.value = userData.firstName;
 	LAST_NAME_FIELD.value = userData.lastName;
-	JOB_TITLE_FIELD.value = userData.jobTitle;
-	SCHOOL_NAME_FIELD.value = userData.schoolName;
-	LOCATION_FIELD.value = userData.location;
+	GRADE_FIELD.value = userData.grade;
+	GRAD_YEAR_FIELD.value = userData.graduateYear;
 }
 
 async function updateUserProfile(event) {
@@ -114,9 +113,8 @@ async function updateUserProfile(event) {
 	sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", {
 		firstName: FIRST_NAME_FIELD.value,
 		lastName: LAST_NAME_FIELD.value,
-		jobTitle: JOB_TITLE_FIELD.value,
-		schoolName: SCHOOL_NAME_FIELD.value,
-		location: LOCATION_FIELD.value,
+		grade: GRADE_FIELD.value,
+		graduateYear: GRAD_YEAR_FIELD.value,
 	})
 		.then(async () => {
 			showMessage(profileMessage, FormMessageType.Success, "Profile updated!");
@@ -144,12 +142,7 @@ async function detectChanges(event) {
 			}
 		}
 	});
-
-	if (changed) {
-		enableSubmit(PROFILE_SUBMIT);
-	} else {
-		disableSubmit(PROFILE_SUBMIT);
-	}
+	changed ? enableSubmit(PROFILE_SUBMIT) : disableSubmit(PROFILE_SUBMIT);
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -170,52 +163,19 @@ export async function updateSecurity(event) {
 	loadingSubmit(SECURITY_SUBMIT);
 
 	if (auth.currentUser) {
-		const newPassword = NEW_PASSWORD_FIELD.value;
-		const email = EMAIL_FIELD.value;
-
 		// UPDATE PASSWORD
-		if (newPassword) {
-			updatePassword(auth.currentUser, newPassword)
+		if (NEW_PASSWORD_FIELD.value) {
+			updatePassword(auth.currentUser, NEW_PASSWORD_FIELD.value)
 				.then(() => {
 					showMessage(PASSWORD_MESSAGE, FormMessageType.Success, "Password updated successfully.");
 					NEW_PASSWORD_FIELD.value = "";
 					CONFIRM_PASSWORD_FIELD.value = "";
 					disableSubmit(SECURITY_SUBMIT);
 				})
-				.catch((err) => {});
-		}
-
-		if (email && email !== auth.currentUser.email) {
-			updateEmail(auth.currentUser, email)
-				.then(async () => {
-					showMessage(EMAIL_MESSAGE, FormMessageType.Success, "Email updated successfully.");
-					disableSubmit(SECURITY_SUBMIT);
-					await sendRequest(`/user/profile/${auth.currentUser.uid}`, "post", { email });
-					await refreshUserData();
-				})
 				.catch((err) => {
 					console.error(err);
-					if (err.code === "auth/requires-recent-login") {
-						formToSubmit = SECURITY_FORM;
-						show(REAUTH_MODAL);
-						enableSubmit(SECURITY_SUBMIT);
-					}
 				});
 		}
-	}
-}
-
-/**
- * Validate Email Field
- * Makes sure the email field is filled
- */
-function validateEmailField() {
-	if (!EMAIL_FIELD.value) {
-		showMessage(EMAIL_MESSAGE, FormMessageType.Error, "This field is required!");
-		disableSubmit(SECURITY_SUBMIT);
-	} else {
-		hideMessage(EMAIL_MESSAGE);
-		enableSubmit(SECURITY_SUBMIT);
 	}
 }
 

@@ -66,15 +66,17 @@
 			email: SIGNUP_FORM_EL["email"].value,
 			firstName: SIGNUP_FORM_EL["first-name"].value,
 			lastName: SIGNUP_FORM_EL["last-name"].value,
-			grade: SIGNUP_FORM_EL["grade"].value,
-			graduateYear: SIGNUP_FORM_EL["graduate-year"].value,
+			schoolName: SIGNUP_FORM_EL["school-name"].value,
+			location: SIGNUP_FORM_EL["school-location"].value,
+			jobTitle: SIGNUP_FORM_EL["job-title"].value,
+			referral: SIGNUP_FORM_EL["referral"].value,
 		};
 
 		await sendRequest("get", "/user/checkIfApproved", null, { email: formData.email })
 			.then((res) => {
 				createUserWithEmailAndPassword(auth, formData.email, SIGNUP_FORM_EL["password"].value)
 					.then(async (userCredential) => {
-						const endpoint = `/user/create/student/${userCredential.user.uid}`;
+						const endpoint = `/user/create/teacher/${userCredential.user.uid}`;
 						await sendRequest("post", endpoint, formData, null);
 
 						await updateProfile(userCredential.user, {

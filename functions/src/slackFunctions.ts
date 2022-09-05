@@ -125,22 +125,14 @@ export async function slackSubscribeNotification(
 	postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
 }
 
-export async function slackSignupNotification(
-	uid: string,
-	email: string,
-	firstName: string,
-	lastName: string,
-	jobTitle: string,
-	schoolName: string,
-	location: string,
-	referral: string
-) {
+export async function slackTeacherSignupNotification(teacherData) {
+	const { uid, email, firstName, lastName, jobTitle, schoolName, location, referral } = teacherData;
 	const blocks = [
 		{
 			type: "header",
 			text: {
 				type: "plain_text",
-				text: "👋 New Signup!",
+				text: "👋 New Teacher Signup!",
 			},
 		},
 		{
@@ -177,7 +169,47 @@ export async function slackSignupNotification(
 			],
 		},
 	];
-	const message = `New Signup! 🥳 ${firstName} ${lastName} (${email})`;
+	const message = `👋 New Teacher Signup! ${firstName} ${lastName} (${email})`;
+	await postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
+}
+
+export async function slackStudentSignupNotification(studentData) {
+	const { uid, email, firstName, lastName, grade, graduateYear } = studentData;
+	const blocks = [
+		{
+			type: "header",
+			text: {
+				type: "plain_text",
+				text: "👋 New Student Signup!",
+			},
+		},
+		{
+			type: "section",
+			fields: [
+				{
+					type: "mrkdwn",
+					text: `*Email:*\n${email}`,
+				},
+				{
+					type: "mrkdwn",
+					text: `*Name:*\n${firstName} ${lastName}`,
+				},
+				{
+					type: "mrkdwn",
+					text: `*Grade:*\n${grade}`,
+				},
+				{
+					type: "mrkdwn",
+					text: `*Graduation Year:*\n${graduateYear}`,
+				},
+				{
+					type: "mrkdwn",
+					text: `*User ID:*\n${uid}`,
+				},
+			],
+		},
+	];
+	const message = `👋 New Student Signup! ${firstName} ${lastName} (${email})`;
 	await postBlocksToSlack(blocks, message, process.env.SLACK_SIGNUP_NOTIFS_CHANNEL_ID!);
 }
 

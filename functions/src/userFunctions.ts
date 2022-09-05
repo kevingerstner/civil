@@ -1,59 +1,78 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { slackSignupNotification } from "./slackFunctions";
+import { slackTeacherSignupNotification, slackStudentSignupNotification } from "./slackFunctions";
 
 import express from "express";
 const router = express.Router();
 const db = admin.firestore();
 
-import { checkIfAuthenticated } from "./middleware/authMiddleware";
+import { checkIfAuthenticated, checkIfUser } from "./middleware/authMiddleware";
 import { logError } from "./util/debug";
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  CREATE
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
-router.get("/checkIfApproved", checkIfAuthenticated, async (req, res) => {
-	const email: string = req.body.email;
-	if (!email) return res.status(400).send("No email included in request body.");
+router.get("/checkIfApproved", async (req, res) => {
+	const { email } = req.query;
+	if (!email || typeof email !== "string")
+		return res.status(400).send("No email included in request body.");
 	const domain = email.split("@").pop();
-	if (!domain) return res.status(400).send("This email domain is invalid.");
-
+	if (!domain) return res.status(400).send("Please enter a valid email");
+	console.log(domain);
 	await db
 		.collection("domains")
 		.where("name", "==", domain)
 		.get()
 		.then((domainRes) => {
-			if (domainRes.empty) return res.status(400).send("This domain is not approved.");
+			if (domainRes.empty)
+				return res
+					.status(400)
+					.send(
+						"This email domain is not associated with a registered school. Please contact your school administrator to get your school on Civil."
+					);
 			else return res.status(200).send("This domain is approved.");
 		});
-	return res.status(400);
+	return res.status(400).send();
 });
 
-router.post("/create/student/:uid", checkIfAuthenticated, async (req, res) => {
-	const { email, firstName, lastName, grade, graduateYear } = req.body;
+router.post("/create/student/:uid", checkIfUser, async (req, res) => {
 	const uid = req.params.uid;
+	const { email, firstName, lastName, grade, graduateYear } = req.body;
 
-	await db.collection("users").doc(uid).set({ email, firstName, lastName, grade, graduateYear });
+	const studentData = { uid, role: "student", email, firstName, lastName, grade, graduateYear };
+
+	await Promise.allSettled([
+		grantClaims(uid, ["student", "paid"]),
+		slackStudentSignupNotification(studentData),
+		db.collection("users").doc(uid).set(studentData),
+	]);
+	res.status(200).send();
 });
 
-exports.sendUserDataToSlack = functions.firestore
-	.document("users/{userId}")
-	.onCreate(async (snapshot, context) => {
-		const { email, firstName, lastName, jobTitle, schoolName, location, referral } =
-			snapshot.data();
-		const uid = context.auth?.uid;
-		slackSignupNotification(
-			uid || "",
-			email,
-			firstName,
-			lastName,
-			jobTitle,
-			schoolName,
-			location,
-			referral
-		);
-	});
+router.post("/create/teacher/:uid", checkIfUser, async (req, res) => {
+	const uid = req.params.uid;
+	const { email, firstName, lastName, jobTitle, schoolName, location, referral } = req.body;
+
+	const teacherData = {
+		uid,
+		role: "teacher",
+		email,
+		firstName,
+		lastName,
+		jobTitle,
+		schoolName,
+		location,
+		referral,
+	};
+
+	await Promise.allSettled([
+		grantClaims(uid, ["teacher"]),
+		slackTeacherSignupNotification(teacherData),
+		db.collection("users").doc(uid).set(teacherData),
+	]);
+	res.status(200).send();
+});
 
 exports.handleNewUser = functions.auth.user().onCreate(async (user) => {
 	functions.logger.debug("New user: " + user.uid);
@@ -111,18 +130,23 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
  *  CLAIMS
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
-export async function grantClaim(uid: string, claimName: string) {
+export async function grantClaims(uid: string, claimNames: string[]) {
 	await admin
 		.auth()
 		.getUser(uid)
 		.then(async (user) => {
 			let claims = user.customClaims;
 			if (!claims) claims = {};
-			claims[claimName] = true;
+
+			for (const claimName of claimNames) {
+				claims[claimName] = true;
+			}
+
 			await admin.auth().setCustomUserClaims(user.uid, claims);
+			await notifyClientToRefreshToken(user.uid);
 		})
 		.catch(() => {
-			throw Error("Unable to grant " + claimName + " claim for user " + uid);
+			throw Error("Unable to grant " + claimNames + " claim for user " + uid);
 		});
 }
 
@@ -135,6 +159,7 @@ export async function revokeClaim(uid: string, claimName: string) {
 			if (claims) claims[claimName] = null;
 			else claims = { claimName: null };
 			await admin.auth().setCustomUserClaims(user.uid, claims);
+			await notifyClientToRefreshToken(user.uid);
 		})
 		.catch(() => {
 			throw Error("Unable to grant " + claimName + " claim for user " + uid);

@@ -23,6 +23,20 @@ export const checkIfAuthenticated = (req, res, next) => {
 	});
 };
 
+export const checkIfUser = (req, res, next) => {
+	getAuthToken(req, res, async () => {
+		try {
+			const { authToken } = req;
+			const userInfo = await admin.auth().verifyIdToken(authToken);
+			if (userInfo.uid !== req.params.uid) throw Error();
+			req["currentUser"] = userInfo.uid;
+			return next();
+		} catch (error) {
+			return res.status(401).send({ error: "You are not authorized to make this request" });
+		}
+	});
+};
+
 export const checkIfAdmin = (req, res, next) => {
 	getAuthToken(req, res, async () => {
 		const { authToken } = req;

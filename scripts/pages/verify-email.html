@@ -22,7 +22,9 @@
 
 	const auth = getAuth();
 	onAuthStateChanged(auth, (user) => {
-		if (!user) window.location.replace(LOGIN_URL);
+		if (!user) {
+			window.location.replace(LOGIN_URL);
+		}
 		if (user.emailVerified) window.location.replace("/");
 
 		// Set email text to the user's email
