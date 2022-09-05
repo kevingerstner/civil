@@ -87,6 +87,8 @@ async function refreshUserData() {
 	await sendRequest("get", `/user/profile/${auth.currentUser.uid}`, null, null)
 		.then((res) => {
 			console.log("AFTER REQUEST FINISHED THEN");
+			console.log(res);
+			console.log(res.data);
 			localStorage.setItem("userData", JSON.stringify(res.data));
 			userData = res.data;
 		})
