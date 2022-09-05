@@ -109,9 +109,13 @@ router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
 	if (req.body.firstName) data["firstName"] = req.body.firstName;
 	if (req.body.lastName) data["lastName"] = req.body.lastName;
 	if (req.body.schoolName) data["schoolName"] = req.body.schoolName;
+	if (req.body.email) data["email"] = req.body.email;
+	// Teacher only
 	if (req.body.location) data["location"] = req.body.location;
 	if (req.body.jobTitle) data["jobTitle"] = req.body.jobTitle;
-	if (req.body.email) data["email"] = req.body.email;
+	// Student only
+	if (req.body.grade) data["grade"] = req.body.grade;
+	if (req.body.graduateYear) data["graduateYear"] = req.body.graduateYear;
 
 	db.collection("users")
 		.doc(uid)

@@ -64,7 +64,7 @@ connectAuthEmulator(auth, "http://localhost:9099");
 let token;
 
 let userData = localStorage.getItem("userData");
-if (userData) {
+if (userData && userData !== undefined) {
 	userData = JSON.parse(userData);
 	setUserProfile();
 }
@@ -83,11 +83,8 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
-	console.log("REFRESHING USER DATA");
 	await sendRequest("get", `/user/profile/${auth.currentUser.uid}`, null, null)
 		.then((res) => {
-			console.log("AFTER REQUEST FINISHED THEN");
-			console.log(res);
 			console.log(res.data);
 			localStorage.setItem("userData", JSON.stringify(res.data));
 			userData = res.data;
@@ -353,6 +350,5 @@ async function sendRequest(method, endpoint, data, params) {
 		console.error(err);
 		return err;
 	});
-	console.log("SENDREQUEST END OF FUNCTION");
 	return res;
 }
