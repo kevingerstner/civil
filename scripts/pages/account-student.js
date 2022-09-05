@@ -336,7 +336,8 @@ function loadingSubmit(btnElement) {
 async function sendRequest(endpoint, method, data, params) {
 	await axios({
 		method,
-		url: API_URL + endpoint,
+		//url: API_URL + endpoint,
+		url: "http://localhost:5001/civil-ed/us-central1/api" + endpoint,
 		headers: {
 			Authorization: `Bearer ${token}`,
 		},
