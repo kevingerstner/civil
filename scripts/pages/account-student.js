@@ -83,8 +83,10 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function refreshUserData() {
+	console.log("REFRESHING USER DATA");
 	await sendRequest("get", `/user/profile/${auth.currentUser.uid}`, null, null)
 		.then((res) => {
+			console.log("AFTER REQUEST FINISHED THEN");
 			localStorage.setItem("userData", JSON.stringify(res.data));
 			userData = res.data;
 		})
@@ -347,9 +349,11 @@ async function sendRequest(method, endpoint, data, params) {
 		params,
 	})
 		.then((res) => {
+			console.log("REQUEST FINISHED WE IN THEN");
 			return res;
 		})
 		.catch((err) => {
 			console.error(err);
 		});
+	console.log("SENDREQUEST END OF FUNCTION");
 }
