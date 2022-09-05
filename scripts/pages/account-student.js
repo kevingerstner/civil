@@ -73,6 +73,15 @@ onAuthStateChanged(auth, async (user) => {
 	if (user) {
 		EMAIL_FIELD.value = user.email;
 		token = await user.getIdToken();
+		user.getIdTokenResult().then((res) => {
+			const studentRole = res.claims.student;
+			if (studentRole) {
+				console.log("USER IS STUDENT");
+			} else {
+				console.log("USER IS NOT STUDENT");
+				history.back();
+			}
+		});
 		if (!userData) {
 			await refreshUserData();
 			setUserProfile();
