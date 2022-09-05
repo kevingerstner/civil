@@ -352,6 +352,7 @@ async function sendRequest(method, endpoint, data, params) {
 	})
 		.then((res) => {
 			console.log("REQUEST FINISHED WE IN THEN");
+			console.log(res);
 			return res;
 		})
 		.catch((err) => {
