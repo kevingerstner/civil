@@ -64,7 +64,7 @@ connectAuthEmulator(auth, "http://localhost:9099");
 let token;
 
 let userData = localStorage.getItem("userData");
-if (userData && userData !== undefined) {
+if (userData && userData !== "undefined") {
 	userData = JSON.parse(userData);
 	setUserProfile();
 }
