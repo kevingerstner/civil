@@ -81,7 +81,8 @@
 							displayName: `${formData.firstName} ${formData.lastName}`,
 						});
 
-						const url = new URL(window.location.origin + VERIFY_URL);
+						//const url = new URL(window.location.origin + VERIFY_URL);
+						const url = new URL(window.location.origin + "/account/student");
 						url.searchParams.set("continueURL", continueURL);
 						window.location.href = url;
 					})

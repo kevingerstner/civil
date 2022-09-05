@@ -4,6 +4,7 @@ import {
 	reauthenticateWithCredential,
 	EmailAuthProvider,
 	onAuthStateChanged,
+	connectAuthEmulator,
 	updateEmail,
 } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
@@ -59,6 +60,7 @@ REAUTH_FORM.addEventListener("submit", reauthenticateUser);
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 const auth = getAuth();
+connectAuthEmulator(auth, "http://localhost:9099");
 let token;
 
 let userData = localStorage.getItem("userData");
