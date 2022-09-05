@@ -67,7 +67,7 @@ let userData = localStorage.getItem("userData");
 if (userData && userData !== "undefined") {
 	userData = JSON.parse(userData);
 	setUserProfile();
-}
+} else userData = null;
 
 onAuthStateChanged(auth, async (user) => {
 	if (user) {
