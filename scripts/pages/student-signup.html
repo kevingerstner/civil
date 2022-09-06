@@ -5,20 +5,16 @@
 		createUserWithEmailAndPassword,
 		updateProfile,
 		onAuthStateChanged,
-		connectAuthEmulator,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 	import {
 		getFirestore,
 		setDoc,
 		doc,
-		connectFirestoreEmulator,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
 
-	const APIURL_TEMP = "http://localhost:5001/civil-ed/us-central1/api";
 	// AUTH
 	const auth = getAuth();
 	let token;
-	connectAuthEmulator(auth, "http://localhost:9099");
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
 			token = await user.getIdToken();
@@ -26,7 +22,6 @@
 	});
 
 	const db = getFirestore();
-	connectFirestoreEmulator(db, "localhost", 8080);
 
 	const FormMessageType = {
 		Success: "Success",
@@ -111,7 +106,7 @@
 	async function sendRequest(method, url, data, params) {
 		await axios({
 			method,
-			url: APIURL_TEMP + url,
+			url: API_URL + url,
 			data,
 			params,
 			headers: {

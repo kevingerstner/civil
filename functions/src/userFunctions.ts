@@ -15,8 +15,9 @@ import { logError } from "./util/debug";
 
 router.get("/checkIfApproved", async (req, res) => {
 	const { email } = req.query;
-	if (!email || typeof email !== "string")
+	if (!email || typeof email !== "string") {
 		return res.status(400).send("No email included in request body.");
+	}
 	const domain = email.split("@").pop();
 	if (!domain) return res.status(400).send("Please enter a valid email");
 	console.log(domain);
@@ -25,13 +26,13 @@ router.get("/checkIfApproved", async (req, res) => {
 		.where("name", "==", domain)
 		.get()
 		.then((domainRes) => {
-			if (domainRes.empty)
+			if (domainRes.empty) {
 				return res
 					.status(400)
 					.send(
 						"This email domain is not associated with a registered school. Please contact your school administrator to get your school on Civil."
 					);
-			else return res.status(200).send("This domain is approved.");
+			} else return res.status(200).send("This domain is approved.");
 		});
 	return res.status(400).send();
 });
@@ -168,6 +169,11 @@ export async function revokeClaim(uid: string, claimName: string) {
 		.catch(() => {
 			throw Error("Unable to grant " + claimName + " claim for user " + uid);
 		});
+}
+
+export async function revokeAllClaims(uid: string) {
+	await admin.auth().setCustomUserClaims(uid, null);
+	await notifyClientToRefreshToken(uid);
 }
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=

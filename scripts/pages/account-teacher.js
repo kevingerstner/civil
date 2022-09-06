@@ -5,7 +5,6 @@ import {
 	EmailAuthProvider,
 	onAuthStateChanged,
 	updateEmail,
-	connectAuthEmulator,
 } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
 const FormMessageType = {
@@ -60,7 +59,6 @@ REAUTH_FORM.addEventListener("submit", reauthenticateUser);
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 const auth = getAuth();
-connectAuthEmulator(auth, "http://localhost:9099");
 let token;
 
 let userData = localStorage.getItem("userData");
@@ -86,7 +84,7 @@ onAuthStateChanged(auth, async (user) => {
 			setUserProfile();
 		}
 	} else {
-		window.location.href = "/welcome/login-testing";
+		window.location.href = LOGIN_URL;
 	}
 });
 
@@ -380,8 +378,7 @@ function loadingSubmit(btnElement) {
 async function sendRequest(method, endpoint, data, params) {
 	const res = await axios({
 		method,
-		//url: API_URL + endpoint,
-		url: "http://localhost:5001/civil-ed/us-central1/api" + endpoint,
+		url: API_URL + endpoint,
 		headers: {
 			Authorization: `Bearer ${token}`,
 		},

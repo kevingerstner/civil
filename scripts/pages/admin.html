@@ -7,6 +7,7 @@
 
 	const auth = getAuth();
 	const apiURL = "https://us-central1-civil-ed.cloudfunctions.net/api";
+	//const apiURL = "http://localhost:5001/civil-ed/us-central1/api";
 
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
@@ -22,6 +23,7 @@
 
 	document.getElementById("provision-user").addEventListener("submit", provisionUser);
 	document.getElementById("unprovision-user").addEventListener("submit", unprovisionUser);
+	document.querySelector("#make-student").addEventListener("submit", makeStudent);
 	document.getElementById("set-admin").addEventListener("submit", setAdmin);
 	document.getElementById("get-user-data").addEventListener("submit", getUserData);
 	document.getElementById("get-user-data-email").addEventListener("submit", getUserDataEmail);
@@ -40,6 +42,11 @@
 	async function unprovisionUser(event) {
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/unprovisionUser", "post", { user: email }, null);
+	}
+
+	async function makeStudent(event) {
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/makeStudent", "post", { user: email }, null);
 	}
 
 	async function getUserData(event) {

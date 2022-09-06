@@ -4,8 +4,6 @@ import {
 	reauthenticateWithCredential,
 	EmailAuthProvider,
 	onAuthStateChanged,
-	connectAuthEmulator,
-	updateEmail,
 } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
 
 const FormMessageType = {
@@ -24,7 +22,6 @@ const EMAIL_FIELD = SECURITY_FORM.elements["email"];
 const NEW_PASSWORD_FIELD = SECURITY_FORM.elements["new-password"];
 const CONFIRM_PASSWORD_FIELD = SECURITY_FORM.elements["confirm-password"];
 const SECURITY_SUBMIT = SECURITY_FORM.querySelector('input[type="submit"]');
-const EMAIL_MESSAGE = document.querySelector("#email-message");
 const PASSWORD_MESSAGE = document.querySelector("#password-validation-message");
 const CONFIRM_PASS_MESSAGE = document.querySelector("#change-password-message");
 
@@ -60,7 +57,6 @@ REAUTH_FORM.addEventListener("submit", reauthenticateUser);
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ */
 
 const auth = getAuth();
-connectAuthEmulator(auth, "http://localhost:9099");
 let token;
 
 let userData = localStorage.getItem("userData");
@@ -86,7 +82,7 @@ onAuthStateChanged(auth, async (user) => {
 			setUserProfile();
 		}
 	} else {
-		window.location.href = "/welcome/login-testing";
+		window.location.href = LOGIN_URL;
 	}
 });
 
@@ -346,8 +342,7 @@ function loadingSubmit(btnElement) {
 async function sendRequest(method, endpoint, data, params) {
 	const res = await axios({
 		method,
-		//url: API_URL + endpoint,
-		url: "http://localhost:5001/civil-ed/us-central1/api" + endpoint,
+		url: API_URL + endpoint,
 		headers: {
 			Authorization: `Bearer ${token}`,
 		},

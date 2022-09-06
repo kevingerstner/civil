@@ -5,7 +5,7 @@ const router = express.Router();
 const db = admin.firestore();
 
 import { checkIfAdmin } from "./middleware/authMiddleware";
-import { grantClaims, revokeClaim, getUserData } from "./userFunctions";
+import { grantClaims, revokeClaim, getUserData, revokeAllClaims } from "./userFunctions";
 import { logError } from "./util/debug";
 
 router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
@@ -42,13 +42,31 @@ router.post("/provisionUser", checkIfAdmin, async (req, res) => {
 });
 
 router.post("/unprovisionUser", checkIfAdmin, async (req, res) => {
-	const userToUnprovision = req.body.user;
-	const user = await admin.auth().getUserByEmail(userToUnprovision);
+	const userEmail = req.body.user;
+	const user = await admin.auth().getUserByEmail(userEmail);
 	if (!user) {
-		return res.status(404).send("Could not find user with email " + userToUnprovision);
+		return res.status(404).send("Could not find user with email " + userEmail);
 	}
 	await revokeClaim(user.uid, "paid");
-	return res.status(200).send("Unprovisioned " + userToUnprovision);
+	return res.status(200).send("Unprovisioned " + userEmail);
+});
+
+router.post("/makeStudent", checkIfAdmin, async (req, res) => {
+	const userEmail = req.body.user;
+	const user = await admin.auth().getUserByEmail(userEmail);
+	if (!user) return res.status(404).send("Could not find a user with that email");
+	await revokeAllClaims(user.uid);
+	await grantClaims(user.uid, ["student", "paid"]);
+	return res.status(200).send("Made " + userEmail + " a student");
+});
+
+router.post("/makeTeacher", checkIfAdmin, async (req, res) => {
+	const userEmail = req.body.user;
+	const user = await admin.auth().getUserByEmail(userEmail);
+	if (!user) return res.status(404).send("Could not find a user with that email");
+	await revokeAllClaims(user.uid);
+	await grantClaims(user.uid, ["teacher"]);
+	return res.status(200).send("Made " + userEmail + " a teacher");
 });
 
 router.get("/user", checkIfAdmin, async (req, res) => {
@@ -71,26 +89,6 @@ router.get("/user", checkIfAdmin, async (req, res) => {
 	userData.claims = user.customClaims;
 	return res.status(200).send(userData);
 });
-
-/**
- * Check all documents in "/users" that a user with that id exists, and delete if not found.
- */
-// exports.deleteUserDocumentIfUserNotFound = functions.https.onRequest(async (req, res) => {
-// 	const usersSnapshot = await db.collection("users").get();
-// 	const deletedUsers = [];
-// 	for (let index = 0; index < usersSnapshot.docs.length; index++) {
-// 		const doc = usersSnapshot.docs[index];
-// 		await admin
-// 			.auth()
-// 			.getUser(doc.id)
-// 			.catch((error) => {
-// 				functions.logger.error("Deleting {" + doc.data().email + "}");
-// 				deletedUsers.push(doc.data().email);
-// 				doc.ref.delete();
-// 			});
-// 	}
-// 	res.status(200).send("Deleted " + deletedUsers.length + " user docs.");
-// });
 
 /**
  * Create documents for users that signed up with the old flow
