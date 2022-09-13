@@ -160,15 +160,44 @@ export async function revokeClaim(uid: string, claimName: string) {
 		.auth()
 		.getUser(uid)
 		.then(async (user) => {
-			let claims = user.customClaims;
-			if (claims) claims[claimName] = null;
-			else claims = { claimName: null };
-			await admin.auth().setCustomUserClaims(user.uid, claims);
+			const newClaims = {};
+			for (const i in user.customClaims) {
+				if (i !== claimName) newClaims[i] = true;
+			}
+			await admin.auth().setCustomUserClaims(user.uid, newClaims);
 			await notifyClientToRefreshToken(user.uid);
 		})
 		.catch(() => {
 			throw Error("Unable to grant " + claimName + " claim for user " + uid);
 		});
+}
+
+export async function setRole(uid: string, role: string) {
+	try {
+		const user = await admin.auth().getUser(uid);
+		let oldClaims = user.customClaims;
+		if (!oldClaims) oldClaims = {};
+
+		const newClaims = {};
+		if (oldClaims["paid"]) newClaims["paid"] = true;
+
+		switch (role) {
+			case "student":
+				newClaims["student"] = true;
+				db.collection("users").doc(uid).update({ role: "student" });
+				break;
+			case "teacher":
+				newClaims["teacher"] = true;
+				db.collection("users").doc(uid).update({ role: "teacher" });
+				break;
+			default:
+				throw Error("This role is not supported.");
+		}
+		await admin.auth().setCustomUserClaims(user.uid, newClaims);
+		await notifyClientToRefreshToken(user.uid);
+	} catch (err) {
+		throw Error("Unable to set role " + role + " for user " + uid);
+	}
 }
 
 export async function revokeAllClaims(uid: string) {

@@ -11,6 +11,8 @@
 	const registeredUI = document.querySelector("#registered-ui");
 	const unregisteredUI = document.querySelector("#unregistered-ui");
 
+	const roleText = document.querySelector(".role-text");
+
 	const pricingTab = document.querySelector("#pricing-nav-item");
 
 	const accountButton = document.querySelector("#account-btn");
@@ -32,8 +34,15 @@
 				const teacher = !!idTokenResult.claims.teacher ? true : false;
 				const student = !!idTokenResult.claims.student ? true : false;
 				// Set the link for the account tab
-				if (teacher) accountButton.href = "/account/teacher";
-				else if (student) accountButton.href = "/account/student";
+				if (teacher) {
+					accountButton.href = "/account/teacher";
+					roleText.innerText = "Teacher";
+					show(roleText);
+				} else if (student) {
+					accountButton.href = "/account/student";
+					roleText.innerText = "Student";
+					show(roleText);
+				}
 				// Update if the user is paid
 				if (paid) {
 					show(manageSubscriptionButton);

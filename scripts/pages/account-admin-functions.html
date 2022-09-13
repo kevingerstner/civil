@@ -7,7 +7,6 @@
 
 	const auth = getAuth();
 	const apiURL = "https://us-central1-civil-ed.cloudfunctions.net/api";
-	//const apiURL = "http://localhost:5001/civil-ed/us-central1/api";
 
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
@@ -24,10 +23,10 @@
 	document.getElementById("provision-user").addEventListener("submit", provisionUser);
 	document.getElementById("unprovision-user").addEventListener("submit", unprovisionUser);
 	document.querySelector("#make-student").addEventListener("submit", makeStudent);
+	document.querySelector("#make-teacher").addEventListener("submit", makeTeacher);
 	document.getElementById("set-admin").addEventListener("submit", setAdmin);
 	document.getElementById("get-user-data").addEventListener("submit", getUserData);
 	document.getElementById("get-user-data-email").addEventListener("submit", getUserDataEmail);
-	document.getElementById("get-school-lookup").addEventListener("submit", getSchoolLookupData);
 
 	async function setAdmin(event) {
 		const email = event.target.querySelector(".form_field").value;
@@ -49,6 +48,11 @@
 		sendAdminRequest(event, "/admin/makeStudent", "post", { user: email }, null);
 	}
 
+	async function makeTeacher(event) {
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/makeTeacher", "post", { user: email }, null);
+	}
+
 	async function getUserData(event) {
 		const uid = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/user", "get", null, { uid });
@@ -57,10 +61,6 @@
 	async function getUserDataEmail(event) {
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/user", "get", null, { email });
-	}
-
-	async function getSchoolLookupData(event) {
-		sendAdminRequest(event, "/admin-schools/schoolLookup", "get", null, null);
 	}
 
 	async function sendAdminRequest(event, endpoint, method, data, params) {

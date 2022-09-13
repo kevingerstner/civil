@@ -3,6 +3,7 @@ const router = express.Router();
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { logError } from "./util/debug";
 const db = admin.firestore();
 
 const md5 = require("md5");
@@ -11,18 +12,20 @@ const Mailchimp = require("mailchimp-api-v3");
 const mailchimp = new Mailchimp(mcApiKey);
 const listId = process.env.MAILCHIMP_AUDIENCEID;
 
+export enum MAILCHIMP_TAGS {
+	"Civil+",
+	"Civil Account",
+	"Newsletter",
+}
+
 /* +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=
  * SUBSCRIBE
  * +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=*/
 router.post("/subscribe", async (req, res) => {
 	try {
-		const email = req.body.email;
-		const subscribeLocation = req.body.location;
-		const subscriberHash = md5(email.toLowerCase());
+		const subscriberHash = md5(req.body.email.toLowerCase());
 
-		const mailchimpRoute = `lists/${listId}/members/${subscriberHash}`;
-
-		functions.logger.info("New subscriber: " + email);
+		functions.logger.info("New subscriber: " + req.body.email);
 
 		try {
 			// If a response returns, this member is already in MailChimp.
@@ -30,7 +33,7 @@ router.post("/subscribe", async (req, res) => {
 			// If the user isn't subscribed, subscribe them
 			if (response.status !== "subscribed") {
 				await mailchimp
-					.patch(mailchimpRoute, {
+					.patch(`lists/${listId}/members/${subscriberHash}`, {
 						status: "subscribed",
 					})
 					.then(() => {
@@ -39,7 +42,7 @@ router.post("/subscribe", async (req, res) => {
 			}
 			/* If the user does not have the Newsletter tag, add it.*/
 			await mailchimp
-				.post(mailchimpRoute + "/tags", {
+				.post(`lists/${listId}/members/${subscriberHash}/tags`, {
 					tags: [{ name: "Newsletter", status: "active" }],
 				})
 				.then(() => {
@@ -52,11 +55,11 @@ router.post("/subscribe", async (req, res) => {
 			// if a 404 is returned, the user doesn't exist, and we can subscribe them.
 			if (error.status === 404) {
 				await mailchimp
-					.put(mailchimpRoute, {
-						email_address: email,
+					.put(`lists/${listId}/members/${subscriberHash}`, {
+						email_address: req.body.email,
 						status: "subscribed",
 						tags: ["Newsletter"],
-						merge_fields: { SIGNUPLOC: subscribeLocation },
+						merge_fields: { SIGNUPLOC: req.body.location },
 					})
 					.then(() => {
 						res.status(200).send("Subscribed successfully");
@@ -109,6 +112,31 @@ exports.addNewUserToMailChimp = functions.auth.user().onCreate(async (user) => {
 		}
 	}
 });
+
+export async function addTag(email: string, tagName: MAILCHIMP_TAGS) {
+	const subscriberHash = md5(email.toLowerCase());
+	await mailchimp
+		.post(`lists/${listId}/members/${subscriberHash}/tags`, {
+			tags: [{ name: tagName, status: "active" }],
+		})
+		.catch(async () => {
+			await logError("[MAILCHIMP]", "Error adding the Civil+ Tag to the user " + email);
+		});
+}
+
+export async function removeTag(email: string, tagName: MAILCHIMP_TAGS) {
+	const subscriberHash = md5(email.toLowerCase());
+	await mailchimp
+		.post(`lists/${listId}/members/${subscriberHash}/tags`, {
+			tags: [{ name: tagName, status: "inactive" }],
+		})
+		.catch(async () => {
+			await logError(
+				"[MAILCHIMP]",
+				"Error removing the tag " + tagName + " from the user " + email
+			);
+		});
+}
 
 /** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  * Send Campaigns

@@ -14,6 +14,7 @@ import { checkIfAuthenticated } from "./middleware/authMiddleware";
 import { grantClaims, revokeClaim, notifyClientToRefreshToken, getUserData } from "./userFunctions";
 
 import Stripe from "stripe";
+import { addTag, MAILCHIMP_TAGS, removeTag } from "./mailchimpFunctions";
 const stripe = new Stripe(process.env.STRIPE_KEY!, {
 	apiVersion: "2020-08-27",
 });
@@ -84,6 +85,8 @@ async function handleCheckoutComplete(event) {
 	// This is enforced on the frontend, but double check
 	if (!uid) throw await logError("(💲Stripe Checkout Error💲)", "UID not received.");
 
+	const userData = await getUserData(uid);
+
 	// Add the uid to the customer metadata in Stripe
 	const updateCustomer = async () => {
 		try {
@@ -134,7 +137,6 @@ async function handleCheckoutComplete(event) {
 	// Post a notification to Slack
 	const postSlackNotification = async () => {
 		try {
-			const userData = await getUserData(uid);
 			const { email, firstName, lastName, schoolName, location } = userData;
 			await slackSubscribeNotification(email, firstName, lastName, schoolName, location);
 		} catch (error) {
@@ -147,6 +149,7 @@ async function handleCheckoutComplete(event) {
 		createCustomerDocument(),
 		grantUserAccess(),
 		postSlackNotification(),
+		addTag(userData.email, MAILCHIMP_TAGS["Civil+"]),
 	]);
 }
 
@@ -213,21 +216,37 @@ async function handleSubscriptionUpdated(event) {
 
 async function handleSubscriptionDeleted(event) {
 	const eventData = event.data.object;
-	// Revoke the paid claim from this user
+	// Get the customer's uid and data
 	const uid = await getUserIDByCustomerID(eventData.customer);
+	if (!uid) throw await logError("(SUBSCRIPTION DELETE)", "Unable to get uid from customerID");
+	const userData = await getUserData(uid);
 
-	if (uid) {
-		await revokeClaim(uid, "paid"); // revoke the paid claim
-		notifyClientToRefreshToken(uid); // set the user's token expiration to now so it refreshes
-	} else {
-		logError("(Subscription Deleted)", "Unable to find uid associated with " + eventData.customer);
-	}
+	// Remove the Paid claim from the user
+	const removePaidClaim = async () => {
+		if (uid) {
+			await revokeClaim(uid, "paid"); // revoke the paid claim
+			notifyClientToRefreshToken(uid); // set the user's token expiration to now so it refreshes
+		} else {
+			logError(
+				"(Subscription Deleted)",
+				"Unable to find uid associated with " + eventData.customer
+			);
+		}
+	};
 	// Update the customer document with no access and clear the expiration date
-	await db
-		.collection("customers")
-		.doc(eventData.customer)
-		.update({ active: false, subscription: null });
-	await logMessage("(Subscription Deleted)", "Revoked License for " + eventData.customer);
+	const updateCustomerDoc = async () => {
+		await db
+			.collection("customers")
+			.doc(eventData.customer)
+			.update({ active: false, subscription: null });
+	};
+
+	await Promise.allSettled([
+		removePaidClaim(),
+		updateCustomerDoc(),
+		removeTag(userData.email, MAILCHIMP_TAGS["Civil+"]),
+		logMessage("(Subscription Deleted)", "Revoked License for " + eventData.customer),
+	]);
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-

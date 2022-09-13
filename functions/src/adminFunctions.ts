@@ -5,12 +5,12 @@ const router = express.Router();
 const db = admin.firestore();
 
 import { checkIfAdmin } from "./middleware/authMiddleware";
-import { grantClaims, revokeClaim, getUserData, revokeAllClaims } from "./userFunctions";
+import { grantClaims, revokeClaim, getUserData, setRole } from "./userFunctions";
 import { logError } from "./util/debug";
+import { addTag, MAILCHIMP_TAGS } from "./mailchimpFunctions";
 
 router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
-	const userToGrantAdmin = req.body.email;
-	const user = await admin.auth().getUserByEmail(userToGrantAdmin);
+	const user = await admin.auth().getUserByEmail(req.body.email);
 
 	await admin.auth().setCustomUserClaims(user.uid, {
 		admin: true,
@@ -21,14 +21,21 @@ router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	res.status(200).send("Granted admin privilege");
 });
 
+router.post("/addCivilPlusTag", checkIfAdmin, async (req, res) => {
+	await addTag(req.body.email, MAILCHIMP_TAGS["Civil+"])
+		.then(() => {
+			res.status(200).send(`Added tag to ${req.body.email}`);
+		})
+		.catch((err) => {
+			res.status(400).send("Unable to add tag.");
+		});
+});
+
 router.post("/revokeAdmin", checkIfAdmin, async (req) => {
 	const userToGrantAdmin = req.body.email;
 	const user = await admin.auth().getUserByEmail(userToGrantAdmin);
 
-	await admin.auth().setCustomUserClaims(user.uid, {
-		admin: false,
-		paid: false,
-	});
+	await admin.auth().setCustomUserClaims(user.uid, {});
 });
 
 router.post("/provisionUser", checkIfAdmin, async (req, res) => {
@@ -55,8 +62,8 @@ router.post("/makeStudent", checkIfAdmin, async (req, res) => {
 	const userEmail = req.body.user;
 	const user = await admin.auth().getUserByEmail(userEmail);
 	if (!user) return res.status(404).send("Could not find a user with that email");
-	await revokeAllClaims(user.uid);
-	await grantClaims(user.uid, ["student", "paid"]);
+	await grantClaims(user.uid, ["paid"]);
+	await setRole(user.uid, "student");
 	return res.status(200).send("Made " + userEmail + " a student");
 });
 
@@ -64,8 +71,7 @@ router.post("/makeTeacher", checkIfAdmin, async (req, res) => {
 	const userEmail = req.body.user;
 	const user = await admin.auth().getUserByEmail(userEmail);
 	if (!user) return res.status(404).send("Could not find a user with that email");
-	await revokeAllClaims(user.uid);
-	await grantClaims(user.uid, ["teacher"]);
+	await setRole(user.uid, "teacher");
 	return res.status(200).send("Made " + userEmail + " a teacher");
 });
 
@@ -84,10 +90,16 @@ router.get("/user", checkIfAdmin, async (req, res) => {
 		user = await admin.auth().getUserByEmail(email);
 		if (!user) return res.status(404).send("Could not find user with email " + email);
 	}
-	const userData = await getUserData(user.uid);
-	userData.uid = user.uid; // add in the user id
-	userData.claims = user.customClaims;
-	return res.status(200).send(userData);
+	await getUserData(user.uid)
+		.then((userData) => {
+			userData.uid = user.uid; // add in the user id
+			userData.claims = user.customClaims;
+			return res.status(200).send(userData);
+		})
+		.catch(() => {
+			return res.status(400).send("Could not fetch user data for this user.");
+		});
+	return res.status(400).send();
 });
 
 /**

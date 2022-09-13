@@ -61,6 +61,7 @@
 			if (articleCookie.length >= 3 && !articleCookie.includes(window.location.href)) {
 				PAYWALL_EL.style.display = "block";
 				document.body.style.overflow = "hidden";
+				document.body.style.height = "100%";
 				hidePaidContent();
 			}
 			// HANDLE UI
