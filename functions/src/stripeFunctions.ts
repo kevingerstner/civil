@@ -10,7 +10,7 @@ import {
 } from "./slackFunctions";
 import { FieldValue } from "firebase-admin/firestore";
 const db = admin.firestore();
-import { checkIfAuthenticated } from "./middleware/authMiddleware";
+import { checkIfUser } from "./middleware/authMiddleware";
 import { grantClaims, revokeClaim, notifyClientToRefreshToken, getUserData } from "./userFunctions";
 
 import Stripe from "stripe";
@@ -57,11 +57,15 @@ router.post("/webhook", async (request, response) => {
 			break;
 		}
 		case "customer.subscription.created": {
-			await handleSubscriptionCreated();
+			await handleSubscriptionCreated(event);
 			break;
 		}
 		case "customer.subscription.updated": {
 			await handleSubscriptionUpdated(event);
+			break;
+		}
+		case "customer.subscription.trial_will_end": {
+			await handleSubscriptionTrialWillEnd(event);
 			break;
 		}
 		case "customer.subscription.deleted": {
@@ -73,10 +77,38 @@ router.post("/webhook", async (request, response) => {
 });
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
- * WEBHOOK EVENT HANDLERS
+ * CHECKOUT
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
 
-/* ------------- CHECKOUT ------------------ */
+router.post("/checkout", async (request, response) => {
+	logMessage("(/checkout)", "endpoint called");
+	try {
+		if (!request.body.uid) {
+			throw await logError("(🛒Checkout)", "UID Not included in request body.");
+		}
+		await logMessage("(🛒Checkout)", `User ${request.body.uid} created a checkout session`);
+
+		const session = await stripe.checkout.sessions.create({
+			client_reference_id: request.body.uid,
+			customer_email: request.body.email,
+			line_items: request.body.line_items, // in the form of [{price: '', quantity: ''}]
+			mode: "subscription",
+			success_url: `${DOMAIN}/pay/success`,
+			cancel_url: `${DOMAIN}/pay/cancel`,
+			subscription_data: {
+				trial_period_days: 14,
+			},
+		});
+		response.status(200).json({ url: session.url });
+	} catch (err: any) {
+		await logError(
+			"(🛒Checkout)",
+			"An error occurred creating the checkout session: " + err.message
+		);
+		response.status(400).send(err.message);
+	}
+});
+
 async function handleCheckoutComplete(event) {
 	const eventData = event.data.object;
 	const uid = eventData.client_reference_id;
@@ -153,7 +185,9 @@ async function handleCheckoutComplete(event) {
 	]);
 }
 
-/* ------------- CUSTOMERS ------------------ */
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * CUSTOMERS
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
 
 async function handleCustomerCreated(event) {
 	const eventData = event.data.object;
@@ -170,27 +204,34 @@ async function handleCustomerDeleted(event) {
 	await db.collection("customers").doc(event.data.object.id).delete();
 }
 
-/* ------------- SUBSCRIPTION ----------------- */
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * SUBSCRIPTION
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
 
-async function handleSubscriptionCreated() {
+async function handleSubscriptionCreated(event) {
 	logMessage("(SUBSCRIPTION)", "Subscription created");
+	const eventData = event.data.object;
+
+	await getUserIDByCustomerID(eventData.customer).then(async (uid) => {
+		if (!uid) return;
+		// Give paid claim
+		await grantClaims(uid, ["paid"]);
+	});
+	// Set the subscription's information in the customer document
+	db.collection("customers")
+		.doc(eventData.customer)
+		.set({ subscription: eventData.id }, { merge: true });
 }
 
 async function handleSubscriptionUpdated(event) {
 	const eventData = event.data.object;
 	const customerData = await getCustomerData(eventData.customer);
-	const uid = await getUserIDByCustomerID(eventData.customer);
-	if (!uid) {
-		return await logError(
-			"(Subscription Updated)",
-			"Unable to get UID for customer" + eventData.customer
-		);
-	}
-	const userData = await getUserData(uid);
-	// If the user canceled their subscription at the end of the current period, send a notification
-	if (eventData.cancel_at_period_end) {
-		updateCustomer(eventData.customer, { active: false }); // set the customer's active to false
-		if (uid) {
+	await getUserIDByCustomerID(eventData.customer).then(async (uid) => {
+		if (!uid) return;
+		const userData = await getUserData(uid);
+		// If the user canceled their subscription at the end of the current period, send a notification
+		if (eventData.cancel_at_period_end) {
+			updateCustomer(eventData.customer, { active: false }); // set the customer's active to false
 			await slackSubscriptionCancelledNotification(
 				userData.email,
 				userData.firstName,
@@ -199,19 +240,30 @@ async function handleSubscriptionUpdated(event) {
 					timeZoneName: "short",
 				})
 			);
+		} else {
+			// If cancel_at_period_end is false and active is false, the subscription was previously cancelled
+			if (customerData && customerData.active === false) {
+				updateCustomer(eventData.customer, { active: true });
+				await slackSubscriptionRenewedNotification(
+					userData.email,
+					userData.firstName,
+					userData.lastName
+				);
+			}
 		}
-	} else {
-		// If cancel_at_period_end is false and active is false, the subscription was previously cancelled
-		if (customerData && customerData.active === false) {
-			updateCustomer(eventData.customer, { active: true });
-			await slackSubscriptionRenewedNotification(
-				userData.email,
-				userData.firstName,
-				userData.lastName
-			);
-		}
-	}
+	});
+
 	return;
+}
+
+// Webhook event fired when the Free Trial will end in 3 days.
+//	Sets metadata on the client so the frontend can tell the customer when their trial will end
+async function handleSubscriptionTrialWillEnd(event) {
+	const eventData = event.data.object;
+	await getUserIDByCustomerID(eventData.customer).then((uid) => {
+		if (!uid) return;
+		db.collection("metadata").doc(uid).set({ trialEndsSoon: true }, { merge: true });
+	});
 }
 
 async function handleSubscriptionDeleted(event) {
@@ -238,7 +290,7 @@ async function handleSubscriptionDeleted(event) {
 		await db
 			.collection("customers")
 			.doc(eventData.customer)
-			.update({ active: false, subscription: null });
+			.update({ active: false, subscription: FieldValue.delete() });
 	};
 
 	await Promise.allSettled([
@@ -250,41 +302,14 @@ async function handleSubscriptionDeleted(event) {
 }
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
- * API ENDPOINTS
+ * MANAGE SUBSCRIPTION
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
-
-router.post("/checkout", async (request, response) => {
-	try {
-		if (!request.body.uid) {
-			throw await logError("(🛒Checkout)", "UID Not included in request body.");
-		}
-		await logMessage("(🛒Checkout)", `User ${request.body.uid} created a checkout session`);
-
-		const session = await stripe.checkout.sessions.create({
-			client_reference_id: request.body.uid,
-			customer_email: request.body.email,
-			line_items: request.body.line_items, // in the form of [{price: '', quantity: ''}]
-			mode: "subscription",
-			success_url: `${DOMAIN}/pay/success`,
-			cancel_url: `${DOMAIN}/pay/cancel`,
-			subscription_data: {
-				trial_period_days: 14,
-			},
-		});
-		response.status(200).json({ url: session.url });
-	} catch (err: any) {
-		await logError(
-			"(🛒Checkout)",
-			"An error occurred creating the checkout session: " + err.message
-		);
-		response.status(400).send(err.message);
-	}
-});
 
 /**
  * Creates a customer portal session for the user, which allows them to manage their subscription
  */
-router.post("/create-customer-portal-session", checkIfAuthenticated, async (req, res) => {
+router.post("/create-customer-portal-session", checkIfUser, async (req, res) => {
+	logMessage("(/create-customer-portal-session)", "endpoint called");
 	const uid = req["currentUser"];
 	const customerID = await getCustomerIDbyUserID(uid);
 	if (customerID) {
@@ -303,6 +328,23 @@ router.post("/create-customer-portal-session", checkIfAuthenticated, async (req,
 		}
 	}
 });
+
+// Get the subscription status of a user
+export async function getUserSubscriptionInfo(uid) {
+	const customerId = await getCustomerIDbyUserID(uid);
+	if (!customerId) return await logError("(CUSTOMER)", "Unable to get customerid from user " + uid);
+	const subscriptions = await stripe.subscriptions.list({ customer: customerId, limit: 1 });
+	// TODO Ensure the customer only has one subscription
+	if (subscriptions) {
+		const subscription = subscriptions.data[0];
+		return {
+			status: subscription.status,
+			cancelAtPeriodEnd: subscription.cancel_at_period_end,
+			trialEndDate: subscription.trial_end,
+		};
+	}
+	return null;
+}
 
 /* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
  * HELPER FUNCTIONS
@@ -347,5 +389,15 @@ async function updateCustomer(customer: string, fields) {
 		.doc(customer)
 		.update({ lastUpdated: FieldValue.serverTimestamp() });
 }
+
+/* +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+ * TEST CLOCK
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-*/
+
+router.get("/test-clock/frozen-time", async (req, res) => {
+	logMessage("(/test-clock/frozen-time)", "endpoint called");
+	const testClocks = await stripe.testHelpers.testClocks.list();
+	res.send({ time: testClocks.data[0].frozen_time });
+});
 
 export default router;

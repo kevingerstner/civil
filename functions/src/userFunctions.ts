@@ -7,13 +7,16 @@ const router = express.Router();
 const db = admin.firestore();
 
 import { checkIfAuthenticated, checkIfUser } from "./middleware/authMiddleware";
-import { logError } from "./util/debug";
+import { logError, logMessage } from "./util/debug";
+import { Timestamp } from "firebase-admin/firestore";
+import { getUserSubscriptionInfo as getUserSubscriptionInfo } from "./stripeFunctions";
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  CREATE
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
 router.get("/checkIfApproved", async (req, res) => {
+	await logMessage("(GET /checkIfApproved)", "endpoint called");
 	const { email } = req.query;
 	if (!email || typeof email !== "string") {
 		return res.status(400).send("No email included in request body.");
@@ -37,7 +40,9 @@ router.get("/checkIfApproved", async (req, res) => {
 	return res.status(400).send();
 });
 
-router.post("/create/student/:uid", checkIfUser, async (req, res) => {
+router.post("/create/student/:uid", async (req, res) => {
+	await logMessage("(POST /create/student/:uid)", "endpoint called");
+
 	const uid = req.params.uid;
 	const { email, firstName, lastName, grade, graduateYear } = req.body;
 
@@ -51,7 +56,8 @@ router.post("/create/student/:uid", checkIfUser, async (req, res) => {
 	res.status(200).send();
 });
 
-router.post("/create/teacher/:uid", checkIfUser, async (req, res) => {
+router.post("/create/teacher/:uid", async (req, res) => {
+	await logMessage("(post /create/teacher/:uid)", "endpoint called");
 	const uid = req.params.uid;
 	const { email, firstName, lastName, jobTitle, schoolName, location, referral } = req.body;
 
@@ -84,6 +90,7 @@ exports.handleNewUser = functions.auth.user().onCreate(async (user) => {
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
 router.get("/profile/:uid", checkIfAuthenticated, async (req, res) => {
+	await logMessage("(get /profile/:uid)", "endpoint called");
 	const uid = req.params.uid;
 	const profileData = await getUserData(uid);
 	functions.logger.log(profileData);
@@ -105,6 +112,7 @@ export async function getUserData(uid: string): Promise<any> {
 }
 
 router.post("/profile/:uid", checkIfAuthenticated, async (req, res) => {
+	await logMessage("(post /profile/:uid)", "endpoint called");
 	const uid = req.params.uid;
 	const data = {};
 	if (req.body.firstName) data["firstName"] = req.body.firstName;
@@ -206,12 +214,25 @@ export async function revokeAllClaims(uid: string) {
 }
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+ *  SUBSCRIPTION
+ * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
+router.get("/subscription", checkIfUser, async (req, res) => {
+	await logMessage("(/subscription)", "endpoint called");
+	const uid = req["currentUser"];
+	const subscriptionInfo = await getUserSubscriptionInfo(uid);
+	return res.send(subscriptionInfo);
+});
+
+/* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  METADATA
  * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+= */
 
 // set the user's token expiration to now so it refreshes
 export async function notifyClientToRefreshToken(uid) {
-	await db.collection("metadata").doc(uid).set({ refreshTime: new Date().getTime() });
+	await db
+		.collection("metadata")
+		.doc(uid)
+		.set({ refreshTime: Timestamp.fromDate(new Date()) }, { merge: true });
 }
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=

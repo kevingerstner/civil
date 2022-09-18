@@ -28,7 +28,7 @@ export const checkIfUser = (req, res, next) => {
 		try {
 			const { authToken } = req;
 			const userInfo = await admin.auth().verifyIdToken(authToken);
-			if (userInfo.uid !== req.params.uid) throw Error();
+			if (userInfo.uid !== req.query.uid) throw Error();
 			req["currentUser"] = userInfo.uid;
 			return next();
 		} catch (error) {

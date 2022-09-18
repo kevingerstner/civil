@@ -1,6 +1,8 @@
 <!-------------------------------------
     Code to be added before </body> tag
 ----------------------------------------->
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
 <script>
 	const API_URL = "https://us-central1-civil-ed.cloudfunctions.net/api";
 	const LOGIN_URL = "/welcome/login";
@@ -29,12 +31,13 @@
 		connectFirestoreEmulator,
 	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
 
+	// ACCESS
 	const ACCESS_DENIED_URL = "/pay/pricing";
 	// Pages accessible only to paid users
 	const privatePages = ["/current-events/", "/units/"];
 	// pages that are accessible to any authenticated user
 	const authenticatedPages = ["/account/profile"];
-	const testingPages = ["/account/student"];
+	const testingPages = ["/test/"];
 	const allowList = [
 		"/current-events/electoral-college-vs-popular-vote",
 		"/units/unit-1-foundations-of-american-democracy",
@@ -55,22 +58,28 @@
 	}
 
 	let metadataRef = null;
+	let token = null;
+
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
+			if (isRouteUnauthenticated()) history.back();
+
 			// Send info to GTM
 			localStorage.setItem("uid", user.uid);
 			localStorage.setItem("email", user.email);
 			localStorage.setItem("name", user.displayName);
 
-			if (isRouteUnauthenticated()) history.back();
+			// Get token
+			token = await user.getIdToken();
 
 			try {
 				metadataRef = doc(db, `metadata/${user.uid}`);
 				const metadata = await getDoc(metadataRef);
 				if (metadata.exists()) {
-					const refreshTime = metadata.data().refreshTime;
-					if (refreshTime && refreshTime < new Date()) {
-						user.getIdToken(true); // refresh the token
+					// REFRESH USER ID TOKEN
+					let refreshTime = metadata.data().refreshTime;
+					if (refreshTime && refreshTime.toDate() < new Date()) {
+						token = auth.currentUser.getIdToken(true); // refresh the token
 						await updateDoc(metadataRef, { refreshTime: deleteField() }); // clear this metadata
 						localStorage.removeItem("userData"); // clear user data
 					}
@@ -80,11 +89,22 @@
 			}
 
 			// Check if user is paid or not
-			user.getIdTokenResult().then((idTokenResult) => {
+			user.getIdTokenResult().then(async (idTokenResult) => {
 				const paid = !!idTokenResult.claims.paid ? true : false;
 				console.log(idTokenResult.claims);
+				if (paid) {
+					// Get subscription data, store in localstorage for 2 hours
+					let subscriptionInfo = localStorage.getItem("subscription");
+					if (subscriptionInfo !== null) {
+						subscriptionInfo = JSON.parse(subscriptionInfo);
+						const expires = subscriptionInfo["tokenExpiration"];
+						if (new Date() > expires) await getUserSubscriptionStatus();
+					} else {
+						subscriptionInfo = await getUserSubscriptionStatus();
+					}
+				}
 				// Block private content for unpaid users
-				if (isRoutePrivate() && !idTokenResult.claims.admin) {
+				if (isRoutePrivate()) {
 					if (!idTokenResult.claims.admin && !paid) window.location.replace(ACCESS_DENIED_URL);
 				}
 			});
@@ -93,6 +113,8 @@
 			localStorage.removeItem("uid");
 			localStorage.removeItem("email");
 			localStorage.removeItem("name");
+			localStorage.removeItem("userData");
+			localStorage.removeItem("subscription");
 			// If the route is protected in any way, redirect to access denied / create account
 			if (isRouteAuthenticated() || isRoutePrivate()) window.location.replace(ACCESS_DENIED_URL);
 		}
@@ -134,5 +156,29 @@
 			if (window.location.pathname.startsWith(unauthenticatedPages[i])) return true;
 		}
 		return false;
+	}
+
+	async function getUserSubscriptionStatus() {
+		try {
+			await axios({
+				method: "get",
+				url: API_URL + "/user/subscription",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+				params: {
+					uid: auth.currentUser.uid,
+				},
+			}).then((response) => {
+				const data = response.data;
+				let expires = new Date();
+				expires.setHours(expires.getHours() + 2);
+				data["tokenExpiration"] = expires;
+				console.log(data);
+				localStorage.setItem("subscription", JSON.stringify(data));
+			});
+		} catch (err) {
+			console.error(err);
+		}
 	}
 </script>

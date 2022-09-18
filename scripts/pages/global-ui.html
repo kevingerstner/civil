@@ -1,0 +1,134 @@
+<!-------------------------------------
+    Code for ui that will appear on every page
+----------------------------------------->
+
+<script type="module">
+	import {
+		getAuth,
+		onAuthStateChanged,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+	import {
+		getFirestore,
+		getDoc,
+		updateDoc,
+		deleteField,
+		doc,
+	} from "https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore.js";
+
+	// GLOBAL UI
+	const freeTrialWidget = document.querySelector("#free-trial-widget");
+	const loadingUI = document.querySelector("#loader");
+
+	const auth = getAuth();
+	const db = getFirestore();
+
+	let metadataRef = null;
+	let token = null;
+	let subscriptionData = null;
+	let paid = null;
+
+	onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			// Get token
+			token = await user.getIdToken();
+
+			const idTokenResult = await user.getIdTokenResult();
+			paid = idTokenResult.claims.paid ? true : false;
+
+			let metadataRef = doc(db, `metadata/${user.uid}`);
+			const metadata = await getDoc(metadataRef);
+			if (metadata.exists()) await handleMetadata(metadata);
+
+			await handlePaidUsers();
+		} else {
+			hide(freeTrialWidget);
+		}
+	});
+
+	async function handlePaidUsers() {
+		if (!paid) return;
+		// Check if user has a free trial
+		await getSubscriptionData().then(async (subscriptionData) => {
+			console.log(subscriptionData);
+			if (subscriptionData.status === "trialing") {
+				// Set the trial's end date in the widget
+				let trialEndDate = new Date(subscriptionData.trialEndDate * 1000);
+				trialEndDate = freeTrialWidget.querySelector("#trial-end-date").innerHTML =
+					trialEndDate.toLocaleDateString("en-US", {
+						year: "numeric",
+						month: "long",
+						day: "numeric",
+					});
+				// If the trial is over and the user canceled redirect to the goodbye screen
+				if (new Date() > trialEndDate && subscriptionData.cancelAtPeriodEnd) {
+					window.location.href = "/pay/trial-ended";
+				}
+				// Set the link to manage the user's portal session
+				createCustomerPortalSession();
+				showWidget(freeTrialWidget);
+			}
+		});
+	}
+
+	// Fetch the subscription data from localstorage.
+	// Because this is loaded in from the global body's onAuthStateChanged, it may not be set.
+	// This retries fetching data up to 3 times (if it expects data because user has paid claim)
+	const MAX_RETRIES = 3;
+	function getSubscriptionData() {
+		let retryCounter = 0;
+		return new Promise(function (resolve, reject) {
+			let getDataInterval = setInterval(() => {
+				let subscriptionInfo = localStorage.getItem("subscription");
+				if (subscriptionInfo !== null) {
+					subscriptionInfo = JSON.parse(subscriptionInfo);
+					clearInterval(getDataInterval);
+					resolve(subscriptionInfo);
+				}
+				if (retryCounter === MAX_RETRIES - 1) {
+					clearInterval(getDataInterval);
+					reject("unable to get subscription data");
+				} else retryCounter++;
+				console.log("retrying fetching subscription data ");
+			}, 2000);
+		});
+	}
+
+	async function handleMetadata(metadata) {
+		let trialEndingSoon = metadata.data().trialEndsSoon;
+		if (trialEndingSoon) await handleFreeTrialEnding();
+	}
+
+	async function handleFreeTrialEnding() {
+		// UNHANDLED: SEND A NOTIFICATION TO THE USER
+	}
+
+	function createCustomerPortalSession() {
+		// Set the link to manage the subscription
+		document.querySelector("#manage-subscription-link").addEventListener("click", async () => {
+			load();
+			await axios({
+				method: "post",
+				url: API_URL + "/stripe/create-customer-portal-session",
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+				params: { uid: auth.currentUser.uid },
+			})
+				.then((res) => {
+					window.location.href = res.data.url;
+				})
+				.catch((err) => {
+					console.error(err);
+					return err;
+				});
+		});
+	}
+
+	function load() {
+		show(loadingUI);
+	}
+
+	function showWidget(element) {
+		show(element.querySelector(".widget-tiny"));
+	}
+</script>
