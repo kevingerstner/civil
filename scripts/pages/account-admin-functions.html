@@ -25,13 +25,27 @@
 	document.querySelector("#make-student").addEventListener("submit", makeStudent);
 	document.querySelector("#make-teacher").addEventListener("submit", makeTeacher);
 	document.getElementById("set-admin").addEventListener("submit", setAdmin);
+	document.getElementById("revoke-admin").addEventListener("submit", revokeAdmin);
 	document.getElementById("get-user-data").addEventListener("submit", getUserData);
 	document.getElementById("get-user-data-email").addEventListener("submit", getUserDataEmail);
+	document.querySelector("#add-tag-to-subscriber").addEventListener("submit", addTagToSubscriber);
+	document
+		.querySelector("#remove-tag-from-subscriber")
+		.addEventListener("submit", removeTagFromSubscriber);
+
+	/** ADMIN **/
 
 	async function setAdmin(event) {
 		const email = event.target.querySelector(".form_field").value;
 		sendAdminRequest(event, "/admin/grantAdmin", "post", { email }, null);
 	}
+
+	async function revokeAdmin(event) {
+		const email = event.target.querySelector(".form_field").value;
+		sendAdminRequest(event, "/admin/revokeAdmin", "post", { email }, null);
+	}
+
+	/** USER **/
 
 	async function provisionUser(event) {
 		const email = event.target.querySelector(".form_field").value;
@@ -63,7 +77,21 @@
 		sendAdminRequest(event, "/admin/user", "get", null, { email });
 	}
 
-	async function sendAdminRequest(event, endpoint, method, data, params) {
+	/** MAILCHIMP **/
+
+	async function addTagToSubscriber(event) {
+		const email = event.target.elements["email"].value;
+		const tagName = event.target.elements["tagName"].value;
+		sendAdminRequest(event, "/mailchimp/addTag", "post", { email, tagName }, null);
+	}
+
+	async function removeTagFromSubscriber(event) {
+		const email = event.target.elements["email"].value;
+		const tagName = event.target.elements["tagName"].value;
+		sendAdminRequest(event, "/mailchimp/removeTag", "post", { email, tagName }, null);
+	}
+
+	async function sendAdminRequest(event, endpoint, method, data, params, local) {
 		event.preventDefault();
 		event.stopPropagation();
 		const formMessageBox = event.target.querySelector(".form-message_box");
@@ -73,7 +101,7 @@
 		let token = user && (await user.getIdToken(true));
 		axios({
 			method,
-			url: apiURL + endpoint,
+			url: (local ? "http://localhost:5001/civil-ed/us-central1/api" : apiURL) + endpoint,
 			headers: {
 				Authorization: `Bearer ${token}`,
 			},

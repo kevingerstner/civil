@@ -52,6 +52,7 @@
 		event.stopPropagation();
 
 		// Disable UI
+		startLoad();
 		SIGNUP_BTN_EL.classList.add("btn-disabled");
 		hideMessage(FORM_MESSAGE);
 
@@ -64,6 +65,7 @@
 			location: SIGNUP_FORM_EL["school-location"].value,
 			jobTitle: SIGNUP_FORM_EL["job-title"].value,
 			referral: SIGNUP_FORM_EL["referral"].value,
+			newsletter: SIGNUP_FORM_EL["newsletter"].checked,
 		};
 
 		createUserWithEmailAndPassword(auth, formData.email, SIGNUP_FORM_EL["password"].value)
@@ -92,6 +94,7 @@
 				}
 				showMessage(FORM_MESSAGE, FormMessageType.Error, errorMessage);
 				SIGNUP_BTN_EL.classList.remove("btn-disabled");
+				cancelLoad();
 			});
 	}
 

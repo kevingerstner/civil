@@ -53,6 +53,7 @@
 		event.stopPropagation();
 
 		// Disable UI
+		startLoad();
 		SIGNUP_BTN_EL.classList.add("btn-disabled");
 		hideMessage(FORM_MESSAGE);
 
@@ -63,6 +64,7 @@
 			lastName: SIGNUP_FORM_EL["last-name"].value,
 			grade: SIGNUP_FORM_EL["grade"].value,
 			graduateYear: SIGNUP_FORM_EL["graduate-year"].value,
+			newsletter: SIGNUP_FORM_EL["newsletter"].checked,
 		};
 
 		await sendRequest("get", "/user/checkIfApproved", null, { email: formData.email })
@@ -93,12 +95,14 @@
 						}
 						showMessage(FORM_MESSAGE, FormMessageType.Error, errorMessage);
 						SIGNUP_BTN_EL.classList.remove("btn-disabled");
+						cancelLoad();
 					});
 			})
 			.catch((err) => {
 				showMessage(FORM_MESSAGE, FormMessageType.Error, err.response.data);
 				console.error(err.response.data);
 				SIGNUP_BTN_EL.classList.remove("btn-disabled");
+				cancelLoad();
 			});
 	}
 

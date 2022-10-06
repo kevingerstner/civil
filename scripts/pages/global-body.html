@@ -64,11 +64,6 @@
 		if (user) {
 			if (isRouteUnauthenticated()) history.back();
 
-			// Send info to GTM
-			localStorage.setItem("uid", user.uid);
-			localStorage.setItem("email", user.email);
-			localStorage.setItem("name", user.displayName);
-
 			// Get token
 			token = await user.getIdToken();
 
@@ -88,11 +83,20 @@
 				console.log(error);
 			}
 
+			let role = null;
+
 			// Check if user is paid or not
 			user.getIdTokenResult().then(async (idTokenResult) => {
-				const paid = !!idTokenResult.claims.paid ? true : false;
+				const paid = Boolean(idTokenResult.claims.paid);
+				const teacher = Boolean(idTokenResult.claims.teacher);
 				console.log(idTokenResult.claims);
-				if (paid) {
+
+				if (admin) role = "admin";
+				else if (teacher) role = "teacher";
+				else if (student) role = "student";
+				localStorage.setItem("role", role);
+
+				if (paid && teacher) {
 					// Get subscription data, store in localstorage for 2 hours
 					let subscriptionInfo = localStorage.getItem("subscription");
 					if (subscriptionInfo !== null) {
@@ -108,11 +112,17 @@
 					if (!idTokenResult.claims.admin && !paid) window.location.replace(ACCESS_DENIED_URL);
 				}
 			});
+
+			// Send info to GTM
+			localStorage.setItem("uid", user.uid);
+			localStorage.setItem("email", user.email);
+			localStorage.setItem("name", user.displayName);
 		}
 		if (!user) {
 			localStorage.removeItem("uid");
 			localStorage.removeItem("email");
 			localStorage.removeItem("name");
+			localStorage.removeItem("role");
 			localStorage.removeItem("userData");
 			localStorage.removeItem("subscription");
 			// If the route is protected in any way, redirect to access denied / create account

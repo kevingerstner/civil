@@ -2,9 +2,8 @@ import * as express from "express";
 const router = express.Router();
 
 import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import { checkIfAdmin } from "./middleware/authMiddleware";
 import { logError } from "./util/debug";
-const db = admin.firestore();
 
 const md5 = require("md5");
 const mcApiKey = process.env.MAILCHIMP_API_KEY;
@@ -12,15 +11,13 @@ const Mailchimp = require("mailchimp-api-v3");
 const mailchimp = new Mailchimp(mcApiKey);
 const listId = process.env.MAILCHIMP_AUDIENCEID;
 
-export enum MAILCHIMP_TAGS {
-	"Civil+",
-	"Civil Account",
-	"Newsletter",
-}
+export const MAILCHIMP_TAGS = ["Civil+", "Civil Account", "Newsletter"];
 
-/* +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=
+export const USER_ROLE = ["Teacher", "Student"];
+
+/** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  * SUBSCRIBE
- * +-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=+-=*/
+ * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=*/
 router.post("/subscribe", async (req, res) => {
 	try {
 		const subscriberHash = md5(req.body.email.toLowerCase());
@@ -74,69 +71,104 @@ router.post("/subscribe", async (req, res) => {
 	}
 });
 
-/**
- * Triggers when a new user signs up. This function adds them to the Mailchimp Audience.
- */
-exports.addNewUserToMailChimp = functions.auth.user().onCreate(async (user) => {
-	const userDoc = await db.collection("users").doc(user.uid).get();
-	if (userDoc.exists) {
-		const userData = userDoc.data();
-		if (userData) {
-			const { email, newsletter, firstName, lastName } = userData;
-			// If the user selected the "subscribe to newsletter" when signing up, they will get the Newsletter tag.
-			const tags = newsletter ? ["Civil Account", "Newsletter"] : ["Civil Account"];
-			const subscriberHash = md5(email.toLowerCase());
-			const mergeFields = {
+export async function addSubscriber(userData, role) {
+	const { email, newsletter, firstName, lastName } = userData;
+
+	const subscriberHash = md5(email.toLowerCase());
+
+	const tags = ["Civil Account"];
+	// add the newsletter tag if user subscribed
+	if (newsletter) tags.push("Civil+");
+	// add the correct role tag for th user
+	switch (role.toLowerCase()) {
+		case "Student":
+			tags.push("student");
+			break;
+		case "Teacher":
+			tags.push("teacher");
+			break;
+	}
+
+	functions.logger.info(email + (newsletter ? " subscribed to newsletter" : "did not subscribe"));
+
+	await mailchimp
+		.put(`lists/${listId}/members/${subscriberHash}`, {
+			email_address: email,
+			status: "subscribed",
+			tags,
+			merge_fields: {
 				FNAME: firstName,
 				LNAME: lastName,
 				SIGNUPLOC: "Signup Form",
-			};
-
-			functions.logger.info(
-				email + (newsletter ? " subscribed to newsletter" : "did not subscribe")
+			},
+		})
+		.catch(() => {
+			throw new functions.https.HttpsError(
+				"invalid-argument",
+				"That email is invalid. Please a real email address."
 			);
+		});
+}
 
-			await mailchimp
-				.put(`lists/${listId}/members/${subscriberHash}`, {
-					email_address: email,
-					status: "subscribed",
-					tags,
-					merge_fields: mergeFields,
-				})
-				.catch(() => {
-					throw new functions.https.HttpsError(
-						"invalid-argument",
-						"That email is invalid. Please a real email address."
-					);
-				});
-		}
-	}
-});
+/** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+ * Edit Tags
+ * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=*/
 
-export async function addTag(email: string, tagName: MAILCHIMP_TAGS) {
+export async function addTag(email: string, tagName: string) {
 	const subscriberHash = md5(email.toLowerCase());
 	await mailchimp
 		.post(`lists/${listId}/members/${subscriberHash}/tags`, {
 			tags: [{ name: tagName, status: "active" }],
 		})
-		.catch(async () => {
-			await logError("[MAILCHIMP]", "Error adding the Civil+ Tag to the user " + email);
+		.catch(async (err) => {
+			await logError("[MAILCHIMP]", "Could not add the Civil+ Tag to " + email + ": " + err);
 		});
 }
 
-export async function removeTag(email: string, tagName: MAILCHIMP_TAGS) {
+export async function removeTag(email: string, tagName: string) {
 	const subscriberHash = md5(email.toLowerCase());
 	await mailchimp
 		.post(`lists/${listId}/members/${subscriberHash}/tags`, {
 			tags: [{ name: tagName, status: "inactive" }],
 		})
-		.catch(async () => {
-			await logError(
-				"[MAILCHIMP]",
-				"Error removing the tag " + tagName + " from the user " + email
-			);
+		.catch(async (err) => {
+			await logError("[MAILCHIMP]", "Error removing " + tagName + " from " + email + ": " + err);
 		});
 }
+
+/** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+ * Admin
+ * +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=*/
+
+router.post("/addTag", checkIfAdmin, async (req, res) => {
+	const email = req.body.email;
+	const tagName = req.body.tagName;
+	try {
+		if (MAILCHIMP_TAGS.includes(tagName)) {
+			await addTag(email, tagName);
+			res.status(200).send("The tag " + tagName + " was added to subscriber " + email);
+		} else {
+			res.status(400).send("That tag doesn't exist, so it was not added to " + email);
+		}
+	} catch (err) {
+		res.status(400).send("An error occurred: " + err);
+	}
+});
+
+router.post("/removeTag", checkIfAdmin, async (req, res) => {
+	const email = req.body.email;
+	const tagName = req.body.tagName;
+	try {
+		if (MAILCHIMP_TAGS.includes(tagName)) {
+			await removeTag(email, tagName);
+			res.status(200).send("The tag " + tagName + " was added to subscriber " + email);
+		} else {
+			res.status(400).send("That tag doesn't exist, so it was not added to " + email);
+		}
+	} catch (err) {
+		res.status(400).send("An error occurred: " + err);
+	}
+});
 
 /** +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  * Send Campaigns

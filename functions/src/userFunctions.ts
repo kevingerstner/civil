@@ -10,6 +10,7 @@ import { checkIfAuthenticated, checkIfUser } from "./middleware/authMiddleware";
 import { logError, logMessage } from "./util/debug";
 import { Timestamp } from "firebase-admin/firestore";
 import { getUserSubscriptionInfo as getUserSubscriptionInfo } from "./stripeFunctions";
+import { addSubscriber } from "./mailchimpFunctions";
 
 /* +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
  *  CREATE
@@ -44,13 +45,23 @@ router.post("/create/student/:uid", async (req, res) => {
 	await logMessage("(POST /create/student/:uid)", "endpoint called");
 
 	const uid = req.params.uid;
-	const { email, firstName, lastName, grade, graduateYear } = req.body;
+	const { email, firstName, lastName, grade, graduateYear, newsletter } = req.body;
 
-	const studentData = { uid, role: "student", email, firstName, lastName, grade, graduateYear };
+	const studentData = {
+		uid,
+		role: "student",
+		email,
+		firstName,
+		lastName,
+		grade,
+		graduateYear,
+		newsletter,
+	};
 
 	await Promise.allSettled([
 		grantClaims(uid, ["student", "paid"]),
 		slackStudentSignupNotification(studentData),
+		addSubscriber(studentData, "Student"),
 		db.collection("users").doc(uid).set(studentData),
 	]);
 	res.status(200).send();
@@ -59,7 +70,8 @@ router.post("/create/student/:uid", async (req, res) => {
 router.post("/create/teacher/:uid", async (req, res) => {
 	await logMessage("(post /create/teacher/:uid)", "endpoint called");
 	const uid = req.params.uid;
-	const { email, firstName, lastName, jobTitle, schoolName, location, referral } = req.body;
+	const { email, firstName, lastName, jobTitle, schoolName, location, referral, newsletter } =
+		req.body;
 
 	const teacherData = {
 		uid,
@@ -71,11 +83,13 @@ router.post("/create/teacher/:uid", async (req, res) => {
 		schoolName,
 		location,
 		referral,
+		newsletter,
 	};
 
 	await Promise.allSettled([
 		grantClaims(uid, ["teacher"]),
 		slackTeacherSignupNotification(teacherData),
+		addSubscriber(teacherData, "Teacher"),
 		db.collection("users").doc(uid).set(teacherData),
 	]);
 	res.status(200).send();

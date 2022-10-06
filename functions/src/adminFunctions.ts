@@ -7,7 +7,6 @@ const db = admin.firestore();
 import { checkIfAdmin } from "./middleware/authMiddleware";
 import { grantClaims, revokeClaim, getUserData, setRole } from "./userFunctions";
 import { logError } from "./util/debug";
-import { addTag, MAILCHIMP_TAGS } from "./mailchimpFunctions";
 
 router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	const user = await admin.auth().getUserByEmail(req.body.email);
@@ -21,21 +20,14 @@ router.post("/grantAdmin", checkIfAdmin, async (req, res) => {
 	res.status(200).send("Granted admin privilege");
 });
 
-router.post("/addCivilPlusTag", checkIfAdmin, async (req, res) => {
-	await addTag(req.body.email, MAILCHIMP_TAGS["Civil+"])
-		.then(() => {
-			res.status(200).send(`Added tag to ${req.body.email}`);
-		})
-		.catch((err) => {
-			res.status(400).send("Unable to add tag.");
-		});
-});
+router.post("/revokeAdmin", checkIfAdmin, async (req, res) => {
+	const userToDeleteAdmin = req.body.email;
+	const user = await admin.auth().getUserByEmail(userToDeleteAdmin);
 
-router.post("/revokeAdmin", checkIfAdmin, async (req) => {
-	const userToGrantAdmin = req.body.email;
-	const user = await admin.auth().getUserByEmail(userToGrantAdmin);
+	await revokeClaim(user.uid, "admin");
+	await revokeClaim(user.uid, "paid");
 
-	await admin.auth().setCustomUserClaims(user.uid, {});
+	res.status(200).send("Revoked admin privilege");
 });
 
 router.post("/provisionUser", checkIfAdmin, async (req, res) => {

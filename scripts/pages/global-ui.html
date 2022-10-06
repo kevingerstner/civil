@@ -2,6 +2,18 @@
     Code for ui that will appear on every page
 ----------------------------------------->
 
+<script>
+	const loadingUI = document.querySelector("#loader");
+
+	function startLoad() {
+		show(loadingUI);
+	}
+
+	function cancelLoad() {
+		hide(loadingUI);
+	}
+</script>
+
 <script type="module">
 	import {
 		getAuth,
@@ -17,7 +29,6 @@
 
 	// GLOBAL UI
 	const freeTrialWidget = document.querySelector("#free-trial-widget");
-	const loadingUI = document.querySelector("#loader");
 
 	const auth = getAuth();
 	const db = getFirestore();
@@ -26,6 +37,7 @@
 	let token = null;
 	let subscriptionData = null;
 	let paid = null;
+	let teacher = null;
 
 	onAuthStateChanged(auth, async (user) => {
 		if (user) {
@@ -33,7 +45,8 @@
 			token = await user.getIdToken();
 
 			const idTokenResult = await user.getIdTokenResult();
-			paid = idTokenResult.claims.paid ? true : false;
+			paid = Boolean(idTokenResult.claims.paid);
+			teacher = Boolean(idTokenResult.claims.teacher);
 
 			let metadataRef = doc(db, `metadata/${user.uid}`);
 			const metadata = await getDoc(metadataRef);
@@ -46,7 +59,7 @@
 	});
 
 	async function handlePaidUsers() {
-		if (!paid) return;
+		if (!paid || !teacher) return;
 		// Check if user has a free trial
 		await getSubscriptionData().then(async (subscriptionData) => {
 			console.log(subscriptionData);
@@ -105,7 +118,7 @@
 	function createCustomerPortalSession() {
 		// Set the link to manage the subscription
 		document.querySelector("#manage-subscription-link").addEventListener("click", async () => {
-			load();
+			startLoad();
 			await axios({
 				method: "post",
 				url: API_URL + "/stripe/create-customer-portal-session",
@@ -122,10 +135,6 @@
 					return err;
 				});
 		});
-	}
-
-	function load() {
-		show(loadingUI);
 	}
 
 	function showWidget(element) {

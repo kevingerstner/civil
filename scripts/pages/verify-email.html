@@ -16,10 +16,6 @@
 
 	const LOGIN_URL = "/welcome/login";
 
-	// Show Loader
-	const loader = document.getElementById("loader");
-	loader.style.display = "block";
-
 	const auth = getAuth();
 	onAuthStateChanged(auth, (user) => {
 		if (!user) {
@@ -36,7 +32,6 @@
 		sendEmailVerification(user)
 			.then(() => {
 				emailVerifiedBoxSuccess.style.display = "block";
-				loader.style.display = "none";
 			})
 			.catch((err) => {
 				if (err.code === "auth/too-many-requests") {
@@ -45,7 +40,6 @@
 					emailVerifiedBoxSuccess.style.display = "none";
 					console.log(`Error sending verification email: ${err}`);
 				}
-				loader.style.display = "none";
 			});
 	});
 

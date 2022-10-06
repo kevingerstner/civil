@@ -14,7 +14,7 @@ import { checkIfUser } from "./middleware/authMiddleware";
 import { grantClaims, revokeClaim, notifyClientToRefreshToken, getUserData } from "./userFunctions";
 
 import Stripe from "stripe";
-import { addTag, MAILCHIMP_TAGS, removeTag } from "./mailchimpFunctions";
+import { addTag, removeTag } from "./mailchimpFunctions";
 const stripe = new Stripe(process.env.STRIPE_KEY!, {
 	apiVersion: "2020-08-27",
 });
@@ -181,7 +181,7 @@ async function handleCheckoutComplete(event) {
 		createCustomerDocument(),
 		grantUserAccess(),
 		postSlackNotification(),
-		addTag(userData.email, MAILCHIMP_TAGS["Civil+"]),
+		addTag(userData.email, "Civil+"),
 	]);
 }
 
@@ -270,20 +270,15 @@ async function handleSubscriptionDeleted(event) {
 	const eventData = event.data.object;
 	// Get the customer's uid and data
 	const uid = await getUserIDByCustomerID(eventData.customer);
-	if (!uid) throw await logError("(SUBSCRIPTION DELETE)", "Unable to get uid from customerID");
+	if (!uid) {
+		throw await logError("(SUBSCRIPTION DELETE)", "Unable to get uid from " + eventData.customer);
+	}
 	const userData = await getUserData(uid);
 
 	// Remove the Paid claim from the user
 	const removePaidClaim = async () => {
-		if (uid) {
-			await revokeClaim(uid, "paid"); // revoke the paid claim
-			notifyClientToRefreshToken(uid); // set the user's token expiration to now so it refreshes
-		} else {
-			logError(
-				"(Subscription Deleted)",
-				"Unable to find uid associated with " + eventData.customer
-			);
-		}
+		await revokeClaim(uid, "paid"); // revoke the paid claim
+		await notifyClientToRefreshToken(uid); // set the user's token expiration to now so it refreshes
 	};
 	// Update the customer document with no access and clear the expiration date
 	const updateCustomerDoc = async () => {
@@ -296,8 +291,8 @@ async function handleSubscriptionDeleted(event) {
 	await Promise.allSettled([
 		removePaidClaim(),
 		updateCustomerDoc(),
-		removeTag(userData.email, MAILCHIMP_TAGS["Civil+"]),
-		logMessage("(Subscription Deleted)", "Revoked License for " + eventData.customer),
+		removeTag(userData.email, "Civil+"),
+		logMessage("(SUBSCRIPTION DELETE)", "Revoked License for " + eventData.customer),
 	]);
 }
 
@@ -332,7 +327,7 @@ router.post("/create-customer-portal-session", checkIfUser, async (req, res) => 
 // Get the subscription status of a user
 export async function getUserSubscriptionInfo(uid) {
 	const customerId = await getCustomerIDbyUserID(uid);
-	if (!customerId) return await logError("(CUSTOMER)", "Unable to get customerid from user " + uid);
+	if (!customerId) return;
 	const subscriptions = await stripe.subscriptions.list({ customer: customerId, limit: 1 });
 	// TODO Ensure the customer only has one subscription
 	if (subscriptions) {
